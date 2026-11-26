@@ -7,7 +7,7 @@ test('agent : l’application s’ouvre directement sur l’espace agent', async
   await mockGateway(page, { signedIn: true, grants: { perms: AGENT_PERMS } });
   await page.goto('/');
   await expect(page).toHaveURL(/\/agent$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Mon espace agent' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Aujourd’hui' })).toBeVisible();
   await expect(page.getByRole('banner')).toContainText('Espace agent');
 });
 
@@ -47,7 +47,7 @@ test('candidature acceptée : « Actualiser mes accès » ouvre l’espace agent
   await expect(page.getByRole('link', { name: 'Candidature acceptée' })).toBeVisible();
   await page.getByRole('main').getByRole('button', { name: 'Actualiser mes accès' }).click();
   await expect(page).toHaveURL(/\/agent$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Mon espace agent' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Aujourd’hui' })).toBeVisible();
 });
 
 test('sans droit : l’espace partenaire explique et propose d’actualiser les accès', async ({ page }) => {

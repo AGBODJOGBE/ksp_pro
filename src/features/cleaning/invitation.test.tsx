@@ -15,6 +15,7 @@ const ID = '0192F1C4-7A2B-7C3D-8E4F-5A6B7C8D9E20';
 
 beforeEach(async () => {
   sessionStorage.clear();
+  localStorage.clear();
   await session.clear();
 });
 
@@ -26,9 +27,9 @@ describe('invitation d’un agent', () => {
     expect(isInvitationId(null)).toBe(false);
   });
 
-  it('garde l’invitation dans l’onglet jusqu’à la candidature', () => {
+  it('garde l’invitation sur l’appareil (application installée comprise) jusqu’à la candidature', () => {
     expect(keepInvitation(ID)).toBe(true);
-    expect(sessionStorage.getItem(INVITATION_KEY)).toBe(ID.toLowerCase());
+    expect(localStorage.getItem(INVITATION_KEY)).toContain(ID.toLowerCase());
     expect(readInvitation()).toBe(ID.toLowerCase());
     forgetInvitation();
     expect(readInvitation()).toBeNull();
@@ -36,8 +37,18 @@ describe('invitation d’un agent', () => {
 
   it('refuse un identifiant invalide et ignore une valeur abîmée', () => {
     expect(keepInvitation('pas-un-identifiant')).toBe(false);
-    sessionStorage.setItem(INVITATION_KEY, 'abîmée');
+    localStorage.setItem(INVITATION_KEY, 'abîmée');
     expect(readInvitation()).toBeNull();
+  });
+
+  it('expire 7 jours après l’ouverture du lien, sans être prolongée par une nouvelle ouverture', () => {
+    const opened = Date.parse('2026-11-20T09:00:00Z');
+    const day = 86_400_000;
+    expect(keepInvitation(ID, opened)).toBe(true);
+    expect(keepInvitation(ID, opened + 3 * day)).toBe(true);
+    expect(readInvitation(opened + 7 * day - 1)).toBe(ID.toLowerCase());
+    expect(readInvitation(opened + 7 * day)).toBeNull();
+    expect(localStorage.getItem(INVITATION_KEY)).toBeNull();
   });
 });
 

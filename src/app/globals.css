@@ -280,6 +280,8 @@
   --motion-stagger: 60ms;
   --z-header: 40;
   --z-float: 50;
+  /* Hauteur de la barre de navigation du bas (espace agent, téléphone) : la barre d'action se pose dessus. */
+  --bottom-nav-h: 0px;
 }
 
 @media (min-width: 64rem) {
