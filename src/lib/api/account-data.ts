@@ -1,13 +1,15 @@
 /**
  * Données d'un compte gardées sur l'appareil :
  *
- * - dans l'onglet (`sessionStorage`), toutes les clés qui commencent par `ksp.` ou `ksp:` : invitation d'un
- *   agent en attente de candidature, brouillons ;
+ * - dans l'onglet (`sessionStorage`) et sur l'appareil (`localStorage`), toutes les clés qui commencent par
+ *   `ksp.` ou `ksp:` : invitation d'un agent en attente de candidature, brouillon de la candidature
+ *   (`lib/device-storage`, 7 jours). Les réglages de confort de l'appareil (`ksp-pro.…`, refus de
+ *   l'incitation à installer) ne sont pas des données du compte : ils restent ;
  * - la base hors ligne de l'Espace pro (IndexedDB `ksp-pro` : tâches du jour, actions en attente), créée par
  *   les parcours de terrain. Elle est effacée dès maintenant, même si elle n'existe pas encore.
  *
  * Elles appartiennent au compte connecté : effacées à la déconnexion, et dès qu'un autre compte se
- * connecte dans le même onglet. Une donnée gardée sans compte (invitation ouverte avant la connexion) est
+ * connecte sur l'appareil. Une donnée gardée sans compte (invitation ouverte avant la connexion) est
  * gardée par le premier compte qui se connecte : c'est le parcours « lien d'invitation, puis connexion ».
  *
  * Module sans dépendance : la session (chargée sur toutes les pages) l'importe à la demande.
@@ -15,22 +17,24 @@
 
 const PREFIXES = ['ksp.', 'ksp:'];
 
-/** Compte propriétaire des données de l'onglet. */
+/** Compte propriétaire des données gardées (dans chaque stockage). */
 const OWNER_KEY = 'ksp.compte';
 
 /** Base hors ligne de l'Espace pro (F-022). */
 export const OFFLINE_DATABASE = 'ksp-pro';
 
-function tabStorage(): Storage | null {
+type Kind = 'sessionStorage' | 'localStorage';
+const KINDS: ReadonlyArray<Kind> = ['sessionStorage', 'localStorage'];
+
+function storageOf(kind: Kind): Storage | null {
   try {
-    return typeof window === 'undefined' ? null : window.sessionStorage;
+    return typeof window === 'undefined' ? null : window[kind];
   } catch {
     return null;
   }
 }
 
-function clearTab(): void {
-  const storage = tabStorage();
+function clearStorage(storage: Storage | null): void {
   if (!storage) return;
   try {
     const keys: string[] = [];
@@ -64,19 +68,25 @@ function clearOfflineDatabase(): Promise<void> {
 
 /** Efface toutes les données du compte sur l'appareil (déconnexion, changement de compte). */
 export function clearAccountData(): Promise<void> {
-  clearTab();
+  KINDS.forEach((kind) => clearStorage(storageOf(kind)));
   return clearOfflineDatabase();
 }
 
-/** Attribue les données de l'onglet au compte connecté ; celles d'un autre compte sont effacées. */
+/** Attribue les données gardées au compte connecté ; celles d'un autre compte sont effacées. */
 export function claimAccountData(userId: string): void {
-  const storage = tabStorage();
-  if (!storage) return;
-  try {
-    const owner = storage.getItem(OWNER_KEY);
-    if (owner !== null && owner !== userId) void clearAccountData();
-    storage.setItem(OWNER_KEY, userId);
-  } catch {
-    // Stockage bloqué : les données ne sont pas gardées non plus.
+  const owners = KINDS.map((kind) => {
+    try {
+      return storageOf(kind)?.getItem(OWNER_KEY) ?? null;
+    } catch {
+      return null;
+    }
+  });
+  if (owners.some((owner) => owner !== null && owner !== userId)) void clearAccountData();
+  for (const kind of KINDS) {
+    try {
+      storageOf(kind)?.setItem(OWNER_KEY, userId);
+    } catch {
+      // Stockage bloqué : les données ne sont pas gardées non plus.
+    }
   }
 }

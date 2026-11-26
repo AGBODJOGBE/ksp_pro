@@ -81,22 +81,4 @@ export const cleaningTexts = {
       'Ce lien est incomplet. Ouvrez à nouveau le lien reçu par SMS, ou demandez une nouvelle invitation.',
     validity: 'Une invitation est valable 7 jours.',
   },
-  agentHome: {
-    title: 'Mon espace agent',
-    soonTitle: 'Vos missions arrivent ici',
-    soonText: 'Votre espace agent est en préparation.',
-    soonItems: [
-      'Les tâches du jour, lisibles sans réseau',
-      'Vos affectations à accepter',
-      'Arrivée, photos et fin de séance',
-      'Vos disponibilités',
-    ],
-  },
-  applicationHome: {
-    title: 'Ma candidature',
-    soonTitle: 'Le formulaire de candidature arrive',
-    soonText:
-      'Vous pourrez bientôt candidater ici : identité, photo, communes, compétences et disponibilités.',
-    invitationKept: 'Votre invitation sera jointe à la candidature.',
-  },
 } as const;

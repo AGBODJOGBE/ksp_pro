@@ -141,7 +141,10 @@ describe('données du compte gardées sur l’appareil', () => {
     return { ...opened, user: { ...opened.user, id } };
   };
 
-  beforeEach(() => sessionStorage.clear());
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+  });
 
   it('la déconnexion efface l’invitation et les brouillons de l’onglet', async () => {
     const current = store();
@@ -171,13 +174,13 @@ describe('données du compte gardées sur l’appareil', () => {
   });
 
   it('une invitation ouverte sans compte est gardée par le compte qui se connecte, puis par ses renouvellements', async () => {
-    sessionStorage.setItem('ksp.pro.invitation', 'i1');
+    localStorage.setItem('ksp.pro.invitation', 'i1');
     const current = store();
 
     current.set(ofUser('u1'));
     current.set(ofUser('u1'));
     await vi.dynamicImportSettled();
 
-    expect(sessionStorage.getItem('ksp.pro.invitation')).toBe('i1');
+    expect(localStorage.getItem('ksp.pro.invitation')).toBe('i1');
   });
 });

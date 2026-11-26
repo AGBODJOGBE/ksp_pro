@@ -21,6 +21,7 @@ function stubIndexedDb(outcome: 'success' | 'blocked' | 'error' = 'success') {
 afterEach(() => {
   vi.unstubAllGlobals();
   sessionStorage.clear();
+  localStorage.clear();
 });
 
 describe('données du compte sur l’appareil', () => {
@@ -58,5 +59,22 @@ describe('données du compte sur l’appareil', () => {
     expect(sessionStorage.getItem('ksp.pro.invitation')).toBeNull();
     expect(sessionStorage.getItem('ksp.compte')).toBe('u2');
     expect(deleted).toEqual([OFFLINE_DATABASE]);
+  });
+
+  it('le brouillon et l’invitation gardés sur l’appareil suivent les mêmes règles', async () => {
+    stubIndexedDb();
+    claimAccountData('u1');
+    localStorage.setItem('ksp.pro.candidature', '{}');
+    localStorage.setItem('ksp-pro.installation.refusee', '1');
+
+    claimAccountData('u2');
+    expect(localStorage.getItem('ksp.pro.candidature')).toBeNull();
+    expect(localStorage.getItem('ksp.compte')).toBe('u2');
+
+    localStorage.setItem('ksp.pro.invitation', '{}');
+    await clearAccountData();
+    expect(localStorage.getItem('ksp.pro.invitation')).toBeNull();
+    // Réglage de confort de l'appareil, pas une donnée du compte.
+    expect(localStorage.getItem('ksp-pro.installation.refusee')).toBe('1');
   });
 });

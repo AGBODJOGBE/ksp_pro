@@ -1,0 +1,122 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { ApiError, isBackendPending } from '@/lib/api';
+
+export interface Page<T> {
+  data: T[];
+  nextCursor: string | null;
+}
+
+export interface PagedList<T> {
+  items: T[];
+  /** Première page en cours de lecture. */
+  loading: boolean;
+  /** Page suivante en cours de lecture. */
+  loadingMore: boolean;
+  error: string | null;
+  /** La route n'est pas encore servie par le backend (`isBackendPending`) : afficher `BackendPending`. */
+  pending: boolean;
+  hasMore: boolean;
+  loadMore: () => void;
+  retry: () => void;
+}
+
+/** Message affichable d'une erreur de lecture : celui de la gateway (déjà en français). */
+function defaultDescribe(error: unknown): string {
+  return error instanceof ApiError
+    ? error.message
+    : 'Une erreur est survenue. Réessayez dans quelques instants.';
+}
+
+/**
+ * Liste paginée par curseur (`limit`, `nextCursor`) : première page au chargement, « Afficher plus »
+ * pour la suivante. Une erreur garde les éléments déjà lus et propose de réessayer la dernière lecture.
+ * `load` doit être stable (fonction de module ou `useCallback`).
+ */
+export function usePagedList<T>(
+  load: (cursor?: string) => Promise<Page<T>>,
+  describe: (error: unknown) => string = defaultDescribe,
+): PagedList<T> {
+  const [items, setItems] = useState<T[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [started, setStarted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  // Lecture demandée : `undefined` pour la première page, sinon le curseur ; `attempt` relance la même.
+  const [request, setRequest] = useState<{ cursor?: string; attempt: number }>({ attempt: 0 });
+
+  useEffect(() => {
+    let active = true;
+    const from = request.cursor;
+    load(from).then(
+      (page) => {
+        if (!active) return;
+        setItems((previous) => (from ? [...previous, ...page.data] : page.data));
+        setCursor(page.nextCursor);
+        setStarted(true);
+        setLoading(false);
+        setLoadingMore(false);
+      },
+      (caught: unknown) => {
+        if (!active) return;
+        setError(describe(caught));
+        setPending(isBackendPending(caught));
+        setLoading(false);
+        setLoadingMore(false);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [load, describe, request]);
+
+  function requestPage(from?: string) {
+    setError(null);
+    setPending(false);
+    if (from) setLoadingMore(true);
+    else setLoading(true);
+    setRequest((previous) => ({ cursor: from, attempt: previous.attempt + 1 }));
+  }
+
+  return {
+    items,
+    loading,
+    loadingMore,
+    error,
+    pending,
+    hasMore: !!cursor,
+    loadMore: () => {
+      if (cursor && !loadingMore) requestPage(cursor);
+    },
+    retry: () => requestPage(started && cursor ? cursor : undefined),
+  };
+}
+
+/**
+ * Vue filtrée d'une liste paginée, quand la gateway ne filtre pas elle-même. Tant que moins de
+ * `minimum` éléments passent le filtre et qu'une page suivante existe, elle est lue d'elle-même : la
+ * liste n'apparaît pas vide alors que des éléments retenus restent à lire. `keep` doit être stable.
+ */
+export function useFilteredList<T>(
+  list: PagedList<T>,
+  keep: (item: T) => boolean,
+  minimum: number,
+): PagedList<T> {
+  const items = useMemo(() => list.items.filter(keep), [list.items, keep]);
+  const { loading, loadingMore, error, hasMore, loadMore } = list;
+  const short = items.length < minimum && hasMore && !error;
+
+  useEffect(() => {
+    if (short && !loading && !loadingMore) loadMore();
+  }, [short, loading, loadingMore, loadMore]);
+
+  return {
+    ...list,
+    items,
+    // Rien d'affichable encore, mais la lecture continue : on reste sur « Chargement… ».
+    loading: loading || (short && items.length === 0),
+  };
+}
