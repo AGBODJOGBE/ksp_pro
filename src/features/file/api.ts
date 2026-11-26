@@ -6,11 +6,12 @@ import { putToStorage } from '@/lib/api/upload';
 import type { StoredFile } from './schemas';
 
 /**
- * Finalités utilisées par l'Espace pro (`FileUploadPurpose`) : photos du Nettoyage. La candidature d'un
- * agent l'emprunte aussi pour sa photo et sa pièce d'identité, faute de finalité propre (à valider avec
- * le back : voir `features/cleaning/application/files.ts`).
+ * Finalités utilisées par l'Espace pro (`FileUploadPurpose`) : photos du Nettoyage (la candidature d'un
+ * agent l'emprunte aussi pour sa photo et sa pièce d'identité, faute de finalité propre : à valider avec
+ * le back, voir `features/cleaning/application/files.ts`) ; pièces du Recouvrement (acte, preuve d'un
+ * encaissement).
  */
-export type FilePurpose = 'cleaning_intervention_photo';
+export type FilePurpose = 'cleaning_intervention_photo' | 'recovery_evidence';
 
 /** Types acceptés pour une photo du Nettoyage (contrat de `POST /file/uploads`). */
 export const PHOTO_TYPES: ReadonlyArray<string> = ['image/jpeg', 'image/png', 'image/webp'];

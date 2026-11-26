@@ -5,6 +5,11 @@
       "method": "PUT",
       "path": "/api/v1/cleaning/agent/requests/{id}/location",
       "reason": "inutilisable : aucune vue de l'agent ne donne l'identifiant de la demande (prérequis back B5)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/identity/me",
+      "reason": "le profil (nom, numéro, e-mail vérifié) arrive déjà avec la session (connexion et renouvellement) ; l'e-mail en attente et la suppression du compte se gèrent sur le portail ; l'appeler ajouterait du code lu par toutes les pages (fiches de terrain à moins de 1 Ko du budget)"
     }
   ]
 }

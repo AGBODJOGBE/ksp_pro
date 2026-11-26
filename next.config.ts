@@ -45,6 +45,17 @@ const nextConfig: NextConfig = {
   // Empêche `next dev` d'ajouter des blocs générés aux fichiers de documentation locaux.
   agentRules: false,
   reactStrictMode: true,
+  async redirects() {
+    return [
+      // Lien des notifications du partenaire (proposé au back, prérequis B2) : la fiche n'a qu'une coque
+      // statique, l'identifiant passe dans la recherche. Temporaire : le format du lien reste à valider.
+      {
+        source: '/partenaire/dossiers/:id',
+        destination: '/partenaire/dossier?id=:id',
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },

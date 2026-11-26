@@ -1,3 +1,5 @@
+'use client';
+
 import { ApiError, session } from '@/lib/api';
 import { logout } from './api';
 import { describeError } from './errors';
