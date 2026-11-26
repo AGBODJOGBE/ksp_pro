@@ -5,8 +5,9 @@ import type { BrowserContext, Page, Route } from '@playwright/test';
  * `/api/v1/identity/*`, `/api/v1/cleaning/agent/*`, `/api/v1/cleaning/catalog/zones`, routes de terrain des
  * visites et des séances (idempotence comprise : même clé et même corps, même réponse ; autre corps, 409),
  * envoi de fichiers
- * (`/api/v1/file/*`, avec un stockage simulé sur l'origine de la gateway, autorisée par la CSP) et
- * notifications, au format du contrat `ksp-api.v1.yaml`. En-têtes CORS avec cookies comme la vraie
+ * (`/api/v1/file/*`, avec un stockage simulé sur l'origine de la gateway, autorisée par la CSP),
+ * notifications (liste, préférences) et espace partenaire du Recouvrement (`/api/v1/recovery/partner/*`),
+ * au format du contrat `ksp-api.v1.yaml`. En-têtes CORS avec cookies comme la vraie
  * gateway, et état côté « serveur » (le cookie de renouvellement n'est pas reproduit : la session vit dans
  * ce simulateur). Le jeton d'accès a la forme d'un JWT et porte `roles` et `perms`, comme ceux d'identity
  * (non signé : le front ne vérifie pas la signature).
@@ -51,6 +52,12 @@ export interface GatewayOptions {
   startRefused?: string;
   /** `POST /me/unavailabilities` refusé : chevauche des affectations (409). */
   unavailabilityConflict?: boolean;
+  /** Routes du partenaire refusées (403) : accès pas encore actif (prérequis back B1, cas réel). */
+  partnerForbidden?: boolean;
+  /** `POST …/collections` refusé : dossier suspendu par une contestation (422). */
+  caseSuspended?: boolean;
+  /** Notifications du partenaire (lien vers la fiche d'un dossier, B2) au lieu de celles de l'agent. */
+  partnerNotifications?: boolean;
 }
 
 export interface FakeGateway {
@@ -274,7 +281,11 @@ export async function mockGateway(page: Page, options: GatewayOptions = {}): Pro
     agentStatus: options.agentStatus ?? null,
     assignments: assignmentsAround(Date.now()),
     availability: availability(),
-    notifications: notificationsList(),
+    notifications: (options.partnerNotifications
+      ? partnerNotificationsList()
+      : notificationsList()) as ReturnType<typeof partnerNotificationsList>,
+    preferences: { whatsapp: true, email: true, updatedAt: null as string | null },
+    partnerActs: partnerActs(),
     uploads: 0,
   };
   const employmentKind = options.employmentKind ?? 'independent';
@@ -415,6 +426,112 @@ export async function mockGateway(page: Page, options: GatewayOptions = {}): Pro
         return reply(200, outcome.view);
       }
       return reply(200, field.kind === 'visit' ? visitResponse(visit) : sessionResponse(fieldSession));
+    }
+
+    // Espace partenaire du Recouvrement : seulement ses assignations (404 sinon), clé d'idempotence rejouable.
+    const partner =
+      /^(GET|POST) \/api\/v1\/recovery\/partner\/assignments(?:\/([^/]+)(?:\/(acts|collections))?)?$/.exec(
+        route_,
+      );
+    if (partner) {
+      if (!authorized) return unauthorized();
+      if (options.partnerForbidden)
+        return reply(
+          403,
+          error('AUTH_FORBIDDEN', "Vous n'avez pas les droits nécessaires pour cette action."),
+        );
+      const [, method, id, action] = partner;
+      if (!id) {
+        const status = url.searchParams.get('status') ?? 'active';
+        const all = PARTNER_ASSIGNMENTS.filter((item) => item.status === status).map((item) => ({
+          ...item,
+          acts: item.id === PARTNER_ASSIGNMENT_ID ? state.partnerActs : item.acts,
+        }));
+        // Deux pages pour les dossiers en cours (curseur), une seule ailleurs.
+        const cursor = url.searchParams.get('cursor');
+        const page = status === 'active' ? (cursor ? all.slice(1) : all.slice(0, 1)) : all;
+        const nextCursor = status === 'active' && !cursor && all.length > 1 ? 'page-2' : null;
+        return reply(200, { assignments: page, nextCursor });
+      }
+      const assignment = PARTNER_ASSIGNMENTS.find((item) => item.id === id && item.status === 'active');
+      if (!assignment)
+        return reply(404, error('RECOVERY_ASSIGNMENT_NOT_FOUND', 'Cette assignation est introuvable.'));
+      if (method === 'GET' && !action) return reply(200, assignmentFile(assignment, state.partnerActs));
+      if (method !== 'POST' || !action)
+        return reply(404, error('GATEWAY_ROUTE_NOT_FOUND', "Cette adresse n'existe pas."));
+      const key = request.headers()['idempotency-key'] ?? '';
+      gateway.field.push({ method: request.method(), path, key, body });
+      const serialized = JSON.stringify(body ?? {});
+      const replay = replays.get(key);
+      if (replay)
+        return replay.body === serialized
+          ? reply(200, replay.response)
+          : reply(
+              409,
+              error('RECOVERY_IDEMPOTENCY_KEY_REUSED', 'Cette clé a déjà servi pour une autre opération.'),
+            );
+      const today = new Date().toISOString().slice(0, 10);
+      if (action === 'acts') {
+        if (String(body?.actDate) > today)
+          return reply(
+            400,
+            error('RECOVERY_VALIDATION_FAILED', 'Date de l’acte au plus aujourd’hui.', { field: 'actDate' }),
+          );
+        const act = {
+          id: `0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e2${String(state.partnerActs.length + 1).padStart(3, '0')}`,
+          type: String(body?.type),
+          actDate: String(body?.actDate),
+          cost: (body?.cost as { amount: number; currency: string } | undefined) ?? xof(0),
+          fileId: typeof body?.fileId === 'string' ? body.fileId : null,
+          note: typeof body?.note === 'string' ? body.note : null,
+          recordedAt: new Date().toISOString(),
+          nextStepDate: typeof body?.nextStepDate === 'string' ? body.nextStepDate : null,
+        };
+        state.partnerActs = [...state.partnerActs, act];
+        replays.set(key, { body: serialized, response: act });
+        return reply(200, act);
+      }
+      if (options.caseSuspended)
+        return reply(
+          422,
+          error(
+            'RECOVERY_CASE_SUSPENDED',
+            'Ce dossier est suspendu par une contestation : cette action attend la décision du juriste.',
+          ),
+        );
+      const amount = Number((body?.amount as { amount?: number } | undefined)?.amount ?? 0);
+      if (amount < 1 || amount > DUE)
+        return reply(
+          422,
+          error(
+            'RECOVERY_PAYMENT_AMOUNT_INVALID',
+            'Le montant doit être compris entre 1 FCFA et le montant dû (325 000 FCFA).',
+            { due: { amount: DUE, currency: 'XOF' } },
+          ),
+        );
+      const payment = {
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e3001',
+        caseId: assignment.caseId,
+        caseNumber: assignment.caseNumber,
+        source: 'partner',
+        amount: { amount, currency: 'XOF' },
+        receivedOn: String(body?.receivedOn),
+        reference: null,
+        proofFileId: typeof body?.proofFileId === 'string' ? body.proofFileId : null,
+        status: 'pending_approval',
+        recordedBy: {
+          type: 'partner',
+          userId: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8d9e11',
+          displayName: 'Me Koffi Adjovi',
+        },
+        approvedBy: null,
+        rejectionReason: null,
+        collectionId: null,
+        createdAt: new Date().toISOString(),
+        partnerAssignmentId: assignment.id,
+      };
+      replays.set(key, { body: serialized, response: payment });
+      return reply(200, payment);
     }
 
     // Routes à paramètre.
@@ -596,6 +713,17 @@ export async function mockGateway(page: Page, options: GatewayOptions = {}): Pro
       case 'GET /api/v1/notification/notifications/unread-count':
         if (!authorized) return unauthorized();
         return reply(200, { unreadCount: unreadCount() });
+      case 'GET /api/v1/notification/preferences':
+        if (!authorized) return unauthorized();
+        return reply(200, state.preferences);
+      case 'PUT /api/v1/notification/preferences':
+        if (!authorized) return unauthorized();
+        state.preferences = {
+          whatsapp: body?.whatsapp === true,
+          email: body?.email === true,
+          updatedAt: '2026-11-26T10:00:00Z',
+        };
+        return reply(200, state.preferences);
       case 'POST /api/v1/notification/notifications/read-all': {
         if (!authorized) return unauthorized();
         const marked = unreadCount();
@@ -901,3 +1029,281 @@ function applyField(
   }
   return { view: sessionResponse(session) };
 }
+
+/* ——— Espace partenaire du Recouvrement ——— */
+
+export const PARTNER_GRANTS = { roles: ['customer', 'recovery_bailiff'] };
+/** Dossier en cours, ouvert dans les parcours. */
+export const PARTNER_ASSIGNMENT_ID = '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e1001';
+export const WITHDRAWN_ASSIGNMENT_ID = '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e1002';
+/** Reste dû du dossier en cours. */
+const DUE = 325_000;
+const xof = (amount: number) => ({ amount, currency: 'XOF' });
+const PARTNER = {
+  id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e0001',
+  kind: 'bailiff',
+  name: 'Me Koffi Adjovi',
+  office: 'Étude Adjovi, Cotonou',
+};
+
+function partnerActs() {
+  return [
+    {
+      id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e2001',
+      type: 'summons_to_pay',
+      actDate: '2026-11-10',
+      cost: xof(35_000),
+      fileId: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e5001' as string | null,
+      note: 'Sommation remise au débiteur à son domicile.' as string | null,
+      recordedAt: '2026-11-10T15:00:00Z',
+      nextStepDate: '2026-11-24' as string | null,
+    },
+    {
+      id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e2002',
+      type: 'service',
+      actDate: '2026-11-18',
+      cost: xof(0),
+      fileId: null as string | null,
+      note: null as string | null,
+      recordedAt: '2026-11-18T10:30:00Z',
+      nextStepDate: null as string | null,
+    },
+  ];
+}
+
+const assignmentOf = (
+  id: string,
+  caseNumber: string,
+  status: string,
+  assignedAt: string,
+  extra: Partial<{ withdrawnAt: string; withdrawalReason: string; lastUpdateAt: string }> = {},
+) => ({
+  id,
+  caseId: id.replace('8e1', '8e4'),
+  caseNumber,
+  partner: PARTNER,
+  status,
+  assignedAt,
+  withdrawnAt: extra.withdrawnAt ?? null,
+  withdrawalReason: extra.withdrawalReason ?? null,
+  acts: [] as ReturnType<typeof partnerActs>,
+  lastUpdateAt: extra.lastUpdateAt ?? null,
+});
+
+const PARTNER_ASSIGNMENTS = [
+  assignmentOf(PARTNER_ASSIGNMENT_ID, 'REC-2026-00012', 'active', '2026-11-03T09:00:00Z', {
+    lastUpdateAt: '2026-11-18T10:30:00Z',
+  }),
+  assignmentOf('0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e1004', 'REC-2026-00015', 'active', '2026-11-20T09:00:00Z'),
+  assignmentOf(WITHDRAWN_ASSIGNMENT_ID, 'REC-2026-00007', 'withdrawn', '2026-10-02T09:00:00Z', {
+    withdrawnAt: '2026-11-05T11:00:00Z',
+    withdrawalReason: 'Dossier confié à un avocat pour la procédure judiciaire.',
+  }),
+  assignmentOf(
+    '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e1003',
+    'REC-2026-00003',
+    'completed',
+    '2026-09-01T09:00:00Z',
+    {
+      lastUpdateAt: '2026-10-28T16:00:00Z',
+    },
+  ),
+];
+
+const actor = (type: string, displayName: string | null) => ({ type, userId: null, displayName });
+
+function assignmentFile(
+  assignment: (typeof PARTNER_ASSIGNMENTS)[number],
+  acts: ReturnType<typeof partnerActs>,
+) {
+  return {
+    assignment: { ...assignment, acts },
+    debtors: [
+      {
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e6002',
+        kind: 'company',
+        role: 'guarantor',
+        displayName: 'SARL Bâtir Plus',
+        firstNames: null,
+        lastName: null,
+        legalName: 'SARL Bâtir Plus',
+        ifu: '3201912345678',
+        rccm: 'RB/COT/19 B 24567',
+        representativeName: 'Aïcha Bello',
+        phones: [],
+        emails: ['contact@batirplus.bj'],
+        address: 'Lot 214, Akpakpa',
+        communeKey: 'cotonou',
+      },
+      {
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e6001',
+        kind: 'person',
+        role: 'main',
+        displayName: 'Kossi Mensah',
+        firstNames: 'Kossi',
+        lastName: 'Mensah',
+        legalName: null,
+        ifu: null,
+        rccm: null,
+        representativeName: null,
+        phones: ['+2290197001122', '+2290166003344'],
+        emails: ['kossi.mensah@exemple.bj'],
+        address: 'Rue 1024, Fidjrossè, maison à portail vert',
+        communeKey: 'cotonou',
+      },
+    ],
+    claims: [
+      {
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e7001',
+        reference: 'FAC-2026-0142',
+        amount: xof(250_000),
+        dueDate: '2026-06-30',
+        description: 'Fourniture de matériaux de construction',
+      },
+      {
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e7002',
+        reference: 'FAC-2026-0187',
+        amount: xof(100_000),
+        dueDate: '2026-07-31',
+        description: null,
+      },
+    ],
+    amounts: {
+      principal: xof(350_000),
+      interests: xof(15_000),
+      costs: xof(35_000),
+      paid: xof(75_000),
+      waived: xof(0),
+      due: xof(DUE),
+      overpaid: xof(0),
+    },
+    documents: [
+      {
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e8001',
+        kind: 'mandate',
+        fileId: null,
+        documentId: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e8101',
+        label: 'Mandat de recouvrement signé',
+        addedBy: actor('creditor', 'Quincaillerie du Port'),
+        addedAt: '2026-09-15T10:00:00Z',
+        visibleToDebtor: false,
+      },
+      {
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e8002',
+        kind: 'evidence',
+        fileId: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e8201',
+        documentId: null,
+        label: 'Facture FAC-2026-0142',
+        addedBy: actor('creditor', 'Quincaillerie du Port'),
+        addedAt: '2026-09-15T10:05:00Z',
+        visibleToDebtor: true,
+      },
+      {
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e8003',
+        kind: 'formal_notice',
+        fileId: null,
+        documentId: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e8103',
+        label: 'Mise en demeure du 2 octobre 2026',
+        addedBy: actor('staff', null),
+        addedAt: '2026-10-02T09:00:00Z',
+        visibleToDebtor: true,
+      },
+    ],
+    signedPlan: {
+      id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e9001',
+      status: 'defaulted',
+      terms: {
+        firstAmount: xof(50_000),
+        firstDueDate: '2026-08-15',
+        rhythm: 'monthly',
+        installmentsCount: 3,
+      },
+      total: xof(350_000),
+      installments: [
+        {
+          id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e9101',
+          rank: 1,
+          dueDate: '2026-08-15',
+          amount: xof(50_000),
+          paidAmount: xof(50_000),
+          status: 'paid',
+          paidAt: '2026-08-14T12:00:00Z',
+        },
+        {
+          id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e9102',
+          rank: 2,
+          dueDate: '2026-09-15',
+          amount: xof(100_000),
+          paidAmount: xof(25_000),
+          status: 'partial',
+          paidAt: null,
+        },
+        {
+          id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e9103',
+          rank: 3,
+          dueDate: '2026-10-15',
+          amount: xof(100_000),
+          paidAmount: xof(0),
+          status: 'missed',
+          paidAt: null,
+        },
+        {
+          id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e9104',
+          rank: 4,
+          dueDate: '2026-11-15',
+          amount: xof(100_000),
+          paidAmount: xof(0),
+          status: 'missed',
+          paidAt: null,
+        },
+      ],
+      withinScale: true,
+      violations: [],
+      proposedBy: 'debtor',
+      renegotiation: false,
+      documentId: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e8104',
+      signedAt: '2026-08-01T10:00:00Z',
+      missedCount: 2,
+      createdAt: '2026-07-28T10:00:00Z',
+    },
+    notices: [
+      {
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8ea001',
+        documentId: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e8103',
+        status: 'delivered',
+        signedBy: actor('staff', 'Juriste KSP'),
+        issuedAt: '2026-10-02T09:00:00Z',
+        deliveryMethod: 'registered_mail',
+        deliveredAt: '2026-10-06T14:00:00Z',
+        proofFileId: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8e8202',
+        deadlineAt: '2026-10-21T23:59:00Z',
+      },
+    ],
+    creditor: {
+      type: 'organization',
+      id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8eb001',
+      displayName: 'Quincaillerie du Port',
+    },
+  };
+}
+
+const partnerNotificationsList = () => [
+  {
+    id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8de101',
+    templateCode: 'recovery.partner_assigned.partner',
+    title: 'Nouveau dossier confié',
+    body: 'KSP vous confie le dossier REC-2026-00012.',
+    link: `https://pro.ksp.bj/partenaire/dossiers/${PARTNER_ASSIGNMENT_ID}`,
+    createdAt: '2026-11-03T09:05:00Z',
+    readAt: null as string | null,
+  },
+  {
+    id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8de102',
+    templateCode: 'recovery.partner_withdrawn.partner',
+    title: 'Dossier retiré',
+    body: 'Le dossier REC-2026-00007 ne vous est plus confié.',
+    link: null,
+    createdAt: '2026-11-05T11:05:00Z',
+    readAt: '2026-11-05T12:00:00Z' as string | null,
+  },
+];

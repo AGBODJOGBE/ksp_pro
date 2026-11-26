@@ -17,3 +17,14 @@ export const NotificationCenter = dynamic(
   () => import('./notification-center').then((module_) => module_.NotificationCenter),
   { loading: () => <SkeletonCards label="Chargement…" rows={2} /> },
 );
+
+/** Pastille des non lues d'une entrée de navigation : rien au rendu serveur, chargée après l'affichage. */
+export const UnreadBadge = dynamic(() => import('./unread-badge').then((module_) => module_.UnreadBadge), {
+  ssr: false,
+});
+
+/** Préférences de notification (compte du partenaire). */
+export const NotificationPreferences = dynamic(
+  () => import('./notification-preferences').then((module_) => module_.NotificationPreferences),
+  { loading: () => <SkeletonCards label="Chargement…" rows={1} media={false} /> },
+);

@@ -3,6 +3,8 @@
 export const notificationTexts = {
   title: 'Notifications',
   lead: 'Les messages de KSP sur vos affectations et votre compte.',
+  partnerLead: 'Les messages de KSP sur les dossiers qui vous sont confiés.',
+  openFile: 'Voir le dossier',
   loading: 'Chargement des notifications…',
   retry: 'Réessayer',
   loadMore: 'Afficher plus',

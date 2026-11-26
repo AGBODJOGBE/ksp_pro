@@ -28,5 +28,13 @@ export const markReadSchema = z.object({ notification: inAppNotificationSchema, 
 
 export const markAllReadSchema = z.object({ marked: z.int(), unreadCount: z.int() });
 
+/** `NotificationPreferences` : canaux des messages facultatifs. */
+export const preferencesSchema = z.object({
+  whatsapp: z.boolean(),
+  email: z.boolean(),
+  updatedAt: z.nullable(z.string()),
+});
+
 export type InAppNotification = z.infer<typeof inAppNotificationSchema>;
+export type NotificationPreferences = z.infer<typeof preferencesSchema>;
 export type NotificationList = z.infer<typeof notificationListSchema>;

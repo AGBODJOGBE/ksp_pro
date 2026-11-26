@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonLink } from '@/components/ui/button';
 import { FormMessage } from '@/components/ui/field';
 import { Heading } from '@/components/ui/heading';
 import { PagedListState } from '@/components/ui/paged-list-state';
@@ -11,14 +11,20 @@ import { cn } from '@/lib/cn';
 import { formatDateTime } from '@/lib/format';
 import { usePagedList } from '@/lib/use-paged-list';
 import { listNotifications, markAllRead, markRead } from '@/features/notification/api';
+import { internalLink } from '@/features/notification/links';
 import type { InAppNotification } from '@/features/notification/schemas';
 import { notificationTexts as t } from '@/features/notification/texts';
 
 const describe = (error: unknown) => (error instanceof ApiError ? error.message : t.genericError);
 
+/** Espace qui affiche le centre : textes, et liens reconnus (fiche d'un dossier du partenaire). */
+export type NotificationSpace = 'agent' | 'partner';
+
 /**
  * Une notification : titre, texte, date, « Marquer comme lue ». Les messages de l'agent n'ont pas de lien
- * (« Retrouvez les détails dans votre application KSP ») : aucun bouton « Voir ».
+ * (« Retrouvez les détails dans votre application KSP ») : aucun bouton « Voir ». Ceux du partenaire
+ * mènent à la fiche du dossier quand leur lien est une adresse de l'Espace pro (B2) : « Voir le dossier »,
+ * jamais préchargé (chaque ouverture de la fiche est tracée par le back).
  */
 function NotificationItem({
   notification,
@@ -30,6 +36,7 @@ function NotificationItem({
   const [pending, setPending] = useState(false);
   const unread = notification.readAt === null;
   const titleId = `notification-${notification.id}`;
+  const href = internalLink(notification.link, globalThis.location?.origin);
 
   async function read() {
     setPending(true);
@@ -62,17 +69,24 @@ function NotificationItem({
             {t.receivedOn(formatDateTime(notification.createdAt))}
           </time>
         </p>
-        {unread ? (
-          <Button
-            variant="ghost"
-            onClick={read}
-            aria-busy={pending || undefined}
-            aria-describedby={titleId}
-            disabled={pending}
-          >
-            {t.markRead}
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {href ? (
+            <ButtonLink href={href} prefetch={false} variant="secondary" aria-describedby={titleId}>
+              {t.openFile}
+            </ButtonLink>
+          ) : null}
+          {unread ? (
+            <Button
+              variant="ghost"
+              onClick={read}
+              aria-busy={pending || undefined}
+              aria-describedby={titleId}
+              disabled={pending}
+            >
+              {t.markRead}
+            </Button>
+          ) : null}
+        </div>
       </div>
     </li>
   );
@@ -166,7 +180,7 @@ const CHIP =
   'inline-flex min-h-12 items-center rounded-full border px-5 font-semibold focus-visible:outline-focus focus-visible:outline-2 focus-visible:outline-offset-2';
 
 /** « Notifications » : filtre (toutes, non lues), liste paginée, marquer lu, tout marquer lu. */
-export function NotificationCenter() {
+export function NotificationCenter({ space = 'agent' }: { space?: NotificationSpace }) {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const choices = [
     { value: false, label: t.filterAll },
@@ -178,7 +192,7 @@ export function NotificationCenter() {
         <Heading as="h1" size="h2">
           {t.title}
         </Heading>
-        <p className="text-ink-muted mt-1">{t.lead}</p>
+        <p className="text-ink-muted mt-1">{space === 'partner' ? t.partnerLead : t.lead}</p>
       </div>
       <div role="group" aria-label={t.filtersLabel} className="flex flex-wrap gap-2">
         {choices.map((choice) => (

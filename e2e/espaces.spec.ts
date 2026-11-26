@@ -15,7 +15,7 @@ test('partenaire : l’application s’ouvre directement sur l’espace partenai
   await mockGateway(page, { signedIn: true, grants: { roles: ['customer', 'recovery_bailiff'] } });
   await page.goto('/');
   await expect(page).toHaveURL(/\/partenaire$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Mon espace partenaire' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Mes dossiers' })).toBeVisible();
 });
 
 test('agent et partenaire : deux grandes cartes', async ({ page }) => {
