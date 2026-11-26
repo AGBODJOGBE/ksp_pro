@@ -15,10 +15,9 @@
  * Module sans dépendance : la session (chargée sur toutes les pages) l'importe à la demande.
  */
 
-const PREFIXES = ['ksp.', 'ksp:'];
+import { OWNER_KEY } from './device-account';
 
-/** Compte propriétaire des données gardées (dans chaque stockage). */
-const OWNER_KEY = 'ksp.compte';
+const PREFIXES = ['ksp.', 'ksp:'];
 
 /** Base hors ligne de l'Espace pro (F-022). */
 export const OFFLINE_DATABASE = 'ksp-pro';

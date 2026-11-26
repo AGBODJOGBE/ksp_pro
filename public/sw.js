@@ -2,15 +2,16 @@
  * Service worker de KSP Pro (F-022), écrit à la main, sans dépendance (≤ 5 Ko).
  * - Pages : réseau d'abord ; sans réseau, la copie gardée ; sinon /hors-ligne.
  * - /_next/static et /icons : cache d'abord (fichiers versionnés).
- * - Jamais l'API ni le stockage des fichiers (autres origines), ni /api du site.
+ * - Jamais l'API ni le stockage des fichiers (autres origines), ni /api du site : les tâches du jour
+ *   viennent d'IndexedDB. Coques de terrain gardées dès l'installation (ouverture hors connexion).
  * Changer VERSION efface les anciens caches à l'activation.
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const PREFIX = 'ksp-pro-';
 const PAGES = PREFIX + 'pages-' + VERSION;
 const ASSETS = PREFIX + 'assets-' + VERSION;
 const OFFLINE = '/hors-ligne';
-const PRECACHE = [OFFLINE, '/'];
+const PRECACHE = [OFFLINE, '/', '/agent', '/agent/visite', '/agent/seance', '/agent/envois'];
 const LIMITS = { [PAGES]: 40, [ASSETS]: 200 };
 const TIMEOUT_MS = 5000;
 

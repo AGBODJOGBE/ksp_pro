@@ -123,7 +123,8 @@ describe('candidature : formulaire', () => {
     next();
     expect(await screen.findByText('Ajoutez une photo de vous.')).toBeInTheDocument();
     const jpeg = (name: string) => new File(['jpeg'], name, { type: 'image/jpeg' });
-    fireEvent.change(screen.getByLabelText('Prendre ou choisir une photo'), {
+    // Champ photo chargé à la demande (features/file/components/lazy.tsx).
+    fireEvent.change(await screen.findByLabelText('Prendre ou choisir une photo'), {
       target: { files: [jpeg('moi.jpg')] },
     });
     expect(await screen.findByText('Photo envoyée : moi.jpg')).toBeInTheDocument();
@@ -131,7 +132,7 @@ describe('candidature : formulaire', () => {
 
     // 3. Pièce d'identité, recto et verso.
     await step('Votre pièce d’identité');
-    const [front, back] = screen.getAllByLabelText('Prendre ou choisir une photo');
+    const [front, back] = await screen.findAllByLabelText('Prendre ou choisir une photo');
     fireEvent.change(front!, { target: { files: [jpeg('recto.jpg')] } });
     expect(await screen.findByText('Photo envoyée : recto.jpg')).toBeInTheDocument();
     fireEvent.change(back!, { target: { files: [jpeg('verso.jpg')] } });

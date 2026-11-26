@@ -1,8 +1,10 @@
-import type { Page, Route } from '@playwright/test';
+import type { BrowserContext, Page, Route } from '@playwright/test';
 
 /**
  * Gateway simulée par interception des requêtes du navigateur (recopiée du portail) : routes
- * `/api/v1/identity/*`, `/api/v1/cleaning/agent/*`, `/api/v1/cleaning/catalog/zones`, envoi de fichiers
+ * `/api/v1/identity/*`, `/api/v1/cleaning/agent/*`, `/api/v1/cleaning/catalog/zones`, routes de terrain des
+ * visites et des séances (idempotence comprise : même clé et même corps, même réponse ; autre corps, 409),
+ * envoi de fichiers
  * (`/api/v1/file/*`, avec un stockage simulé sur l'origine de la gateway, autorisée par la CSP) et
  * notifications, au format du contrat `ksp-api.v1.yaml`. En-têtes CORS avec cookies comme la vraie
  * gateway, et état côté « serveur » (le cookie de renouvellement n'est pas reproduit : la session vit dans
@@ -43,6 +45,10 @@ export interface GatewayOptions {
   skillsReadable?: boolean;
   /** `PUT /me/availability` refusé : plage occupée par une affectation (409). */
   availabilityInUse?: boolean;
+  /** Fiche de séance : l'agent est chef d'équipe (vrai par défaut). */
+  sessionLead?: boolean;
+  /** `POST /sessions/{id}/start` refusé avec ce code (422). */
+  startRefused?: string;
   /** `POST /me/unavailabilities` refusé : chevauche des affectations (409). */
   unavailabilityConflict?: boolean;
 }
@@ -50,8 +56,21 @@ export interface GatewayOptions {
 export interface FakeGateway {
   forbiddenHeaders: string[];
   calls: Array<{ method: string; path: string; body: unknown; headers: Record<string, string> }>;
+  /** Actions de terrain reçues : méthode, chemin, clé d'idempotence, corps (dans l'ordre). */
+  field: Array<{ method: string; path: string; key: string; body: unknown }>;
   /** Contenus reçus par le stockage simulé. */
   stored: string[];
+  /**
+   * Réseau coupé : la gateway et le stockage simulés ne répondent plus. `context.setOffline` ne suffit pas :
+   * les requêtes interceptées par `page.route` reçoivent quand même leur réponse simulée.
+   */
+  offline: boolean;
+}
+
+/** Coupe ou rétablit le réseau : celui du navigateur et celui de la gateway simulée. */
+export async function setNetwork(context: BrowserContext, gateway: FakeGateway, online: boolean) {
+  gateway.offline = !online;
+  await context.setOffline(!online);
 }
 
 const base64url = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -259,7 +278,11 @@ export async function mockGateway(page: Page, options: GatewayOptions = {}): Pro
     uploads: 0,
   };
   const employmentKind = options.employmentKind ?? 'independent';
-  const gateway: FakeGateway = { forbiddenHeaders: [], calls: [], stored: [] };
+  const gateway: FakeGateway = { forbiddenHeaders: [], calls: [], stored: [], field: [], offline: false };
+  const visit = visitView(Date.now());
+  const fieldSession = sessionView(Date.now(), options.sessionLead ?? true);
+  /** Réponses gardées par clé d'idempotence (rejeu : même réponse). */
+  const replays = new Map<string, { body: string; response: unknown }>();
   const activeContext = { type: 'individual', organizationId: null, organizationName: null };
 
   // Préchargements des liens par le routeur de Next : refusés, comme dans le portail (serveur partagé).
@@ -270,6 +293,7 @@ export async function mockGateway(page: Page, options: GatewayOptions = {}): Pro
 
   // Stockage simulé : `PUT` présigné, sans jeton ni cookie (préflight CORS pour `Content-Type`).
   await page.route(`${STORAGE}/**`, async (route) => {
+    if (gateway.offline) return route.abort('internetdisconnected');
     const request = route.request();
     const cors = {
       'Access-Control-Allow-Origin': request.headers().origin ?? '*',
@@ -277,6 +301,9 @@ export async function mockGateway(page: Page, options: GatewayOptions = {}): Pro
       'Access-Control-Allow-Headers': 'Content-Type',
     };
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    // Lien temporaire de lecture d'une photo : petite image JPEG.
+    if (request.method() === 'GET')
+      return route.fulfill({ status: 200, headers: { ...cors, 'Content-Type': 'image/jpeg' }, body: JPEG });
     gateway.stored.push(`${request.method()} ${new URL(request.url()).pathname}`);
     return route.fulfill({ status: 200, headers: cors, body: '' });
   });
@@ -324,6 +351,7 @@ export async function mockGateway(page: Page, options: GatewayOptions = {}): Pro
   const unreadCount = () => state.notifications.filter((item) => item.readAt === null).length;
 
   await page.route(`${GATEWAY}/api/v1/**`, async (route: Route) => {
+    if (gateway.offline) return route.abort('internetdisconnected');
     const request = route.request();
     const origin = request.headers().origin ?? 'http://localhost:3050';
     const cors = {
@@ -358,6 +386,36 @@ export async function mockGateway(page: Page, options: GatewayOptions = {}): Pro
     const authorized = state.signedIn && request.headers().authorization === `Bearer ${state.token}`;
     const unauthorized = () => reply(401, error('GATEWAY_TOKEN_INVALID', 'Vous devez être connecté.'));
     const route_ = `${request.method()} ${path}`;
+
+    // Routes de terrain (visite, séance) : agent connecté, clé d'idempotence rejouable.
+    const field = fieldRoute(route_);
+    if (field) {
+      if (!authorized) return unauthorized();
+      const key = request.headers()['idempotency-key'] ?? '';
+      if (field.action) {
+        gateway.field.push({ method: request.method(), path, key, body });
+        const serialized = JSON.stringify(body ?? {});
+        const replay = replays.get(key);
+        if (replay)
+          return replay.body === serialized
+            ? reply(200, replay.response)
+            : reply(
+                409,
+                error('CLEANING_IDEMPOTENCY_KEY_REUSED', 'Cette clé a déjà servi pour une autre opération.'),
+              );
+        const outcome = applyField(
+          field,
+          (body ?? {}) as Record<string, unknown>,
+          visit,
+          fieldSession,
+          options,
+        );
+        if ('error' in outcome) return reply(outcome.status, outcome.error);
+        replays.set(key, { body: serialized, response: outcome.view });
+        return reply(200, outcome.view);
+      }
+      return reply(200, field.kind === 'visit' ? visitResponse(visit) : sessionResponse(fieldSession));
+    }
 
     // Routes à paramètre.
     const respond = /^POST \/api\/v1\/cleaning\/agent\/assignments\/([^/]+)\/(accept|decline)$/.exec(route_);
@@ -552,4 +610,294 @@ export async function mockGateway(page: Page, options: GatewayOptions = {}): Pro
   });
 
   return gateway;
+}
+
+/* ——— Terrain : visite des lieux et séance ——— */
+
+export const VISIT_ID = '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8db002';
+export const SESSION_ID = '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8db001';
+
+/** Petite image JPEG valide (1 × 1 pixel). */
+export const JPEG = Buffer.from(
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==',
+  'base64',
+);
+
+const LOCATION = {
+  latitude: 6.4485,
+  longitude: 2.3557,
+  landmark: 'Portail bleu après la pharmacie',
+  address: 'Rue 12, Tankpè',
+  readableAddress: null,
+  accuracyMeters: 15,
+};
+
+const place = () => ({
+  name: 'Villa Les Palmiers',
+  placeTypeName: 'Villa',
+  communeName: 'Abomey-Calavi',
+  location: null as typeof LOCATION | null,
+  customerFirstName: 'Afi',
+});
+
+interface Photo {
+  fileId: string;
+  kind: string;
+  takenAt: string;
+  url: string | null;
+  urlExpiresAt: string | null;
+}
+
+function visitView(now: number) {
+  return {
+    id: VISIT_ID,
+    requestNumber: 'NET-2026-00042',
+    status: 'scheduled',
+    scheduledAt: iso(now - 5 * 60_000),
+    durationMinutes: 60,
+    isLead: true,
+    place: place(),
+    cleaningTypes: [{ id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8dc101', code: 'sol', name: 'Sols' }],
+    parameters: [
+      {
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8dc201',
+        code: 'superficie',
+        label: 'Superficie',
+        kind: 'number',
+        unit: 'm²',
+        min: 10,
+        max: 2000,
+        choices: [],
+        required: true,
+        help: null,
+        active: true,
+      },
+      {
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8dc202',
+        code: 'etat',
+        label: 'État général',
+        kind: 'choice',
+        unit: null,
+        min: null,
+        max: null,
+        choices: [
+          { code: 'propre', label: 'Propre', active: true },
+          { code: 'sale', label: 'Sale', active: true },
+          { code: 'tres_sale', label: 'Très sale', active: false },
+        ],
+        required: true,
+        help: 'Votre impression en entrant.',
+        active: true,
+      },
+      {
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8dc203',
+        code: 'animaux',
+        label: 'Animaux présents',
+        kind: 'boolean',
+        unit: null,
+        min: null,
+        max: null,
+        choices: [],
+        required: false,
+        help: null,
+        active: true,
+      },
+    ],
+    declaredValues: { superficie: 120, etat: 'tres_sale', animaux: false } as Record<string, unknown>,
+    observedValues: null as Record<string, unknown> | null,
+    photos: [] as Photo[],
+    arrival: null as Record<string, unknown> | null,
+    completedAt: null as string | null,
+    note: null as string | null,
+  };
+}
+
+function sessionView(now: number, isLead: boolean) {
+  return {
+    id: SESSION_ID,
+    programNumber: 'PRG-2026-0007',
+    rank: 3,
+    status: 'assigned',
+    scheduledStart: iso(now - 10 * 60_000),
+    scheduledEnd: iso(now + 170 * 60_000),
+    isLead,
+    team: [
+      {
+        agentId: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8d9e30',
+        firstName: 'Koffi',
+        lastName: 'Adjovi',
+        photoUrl: null,
+        isLead,
+        confirmation: 'confirmed',
+      },
+      {
+        agentId: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8d9e31',
+        firstName: 'Rachidi',
+        lastName: 'Sanni',
+        photoUrl: null,
+        isLead: !isLead,
+        confirmation: 'confirmed',
+      },
+    ],
+    place: place(),
+    checklist: [
+      {
+        code: 'arrival',
+        label: 'Matériel déballé',
+        cleaningTypeCode: null as string | null,
+        checked: false,
+        checkedAt: null as string | null,
+      },
+      {
+        code: 'sol_balayage',
+        label: 'Sols balayés',
+        cleaningTypeCode: 'sol' as string | null,
+        checked: false,
+        checkedAt: null as string | null,
+      },
+    ],
+    photos: [] as Photo[],
+    incidents: [] as Array<Record<string, unknown>>,
+    arrival: null as Record<string, unknown> | null,
+    startedAt: null as string | null,
+    completedAt: null as string | null,
+  };
+}
+
+type Visit = ReturnType<typeof visitView>;
+type FieldSession = ReturnType<typeof sessionView>;
+
+/** Position et adresses visibles seulement pendant l'intervention en cours (R-EX-06, B6). */
+const visitResponse = (visit: Visit) => ({
+  ...visit,
+  place: { ...visit.place, location: visit.status === 'in_progress' ? LOCATION : null },
+});
+const sessionResponse = (session: FieldSession) => ({
+  ...session,
+  place: { ...session.place, location: session.status === 'in_progress' ? LOCATION : null },
+});
+
+interface FieldRoute {
+  kind: 'visit' | 'session';
+  action: string | null;
+  fileId?: string;
+}
+
+function fieldRoute(route: string): FieldRoute | null {
+  if (route === `GET /api/v1/cleaning/agent/visits/${VISIT_ID}`) return { kind: 'visit', action: null };
+  if (route === `GET /api/v1/cleaning/agent/sessions/${SESSION_ID}`) return { kind: 'session', action: null };
+  const match =
+    /^(POST|PUT|PATCH|DELETE) \/api\/v1\/cleaning\/(visits|sessions)\/([^/]+)\/([a-z]+)(?:\/([^/]+))?$/.exec(
+      route,
+    );
+  if (!match) return null;
+  const kind = match[2] === 'visits' ? 'visit' : 'session';
+  if (match[3] !== (kind === 'visit' ? VISIT_ID : SESSION_ID)) return null;
+  return { kind, action: `${match[1]} ${match[4]}`, fileId: match[5] };
+}
+
+const photoOf = (fileId: string, kind: string, takenAt: string): Photo => ({
+  fileId,
+  kind,
+  takenAt,
+  url: `${STORAGE}/${fileId}`,
+  urlExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+});
+
+function applyField(
+  field: FieldRoute,
+  body: Record<string, unknown>,
+  visit: Visit,
+  session: FieldSession,
+  options: GatewayOptions,
+): { view: unknown } | { status: number; error: unknown } {
+  const at = typeof body.occurredAt === 'string' ? body.occurredAt : new Date().toISOString();
+  const arrival = {
+    arrivedAt: at,
+    distanceMeters: typeof body.latitude === 'number' ? 42 : null,
+    alert: false,
+    placeAccuracyMeters: 15,
+    arrivalAccuracyMeters: typeof body.accuracyMeters === 'number' ? body.accuracyMeters : null,
+    uncertain: false,
+  };
+  const invalid = () => ({
+    status: 422,
+    error: error('CLEANING_INVALID_TRANSITION', 'Cette action n’est pas possible dans l’état actuel.'),
+  });
+  if (field.kind === 'visit') {
+    switch (field.action) {
+      case 'POST arrive':
+        if (visit.status !== 'scheduled') return invalid();
+        Object.assign(visit, { status: 'in_progress', arrival });
+        break;
+      case 'PUT observations':
+        Object.assign(visit, { observedValues: body.values, note: body.note ?? null });
+        break;
+      case 'POST photos':
+        visit.photos.push(photoOf(String(body.fileId), 'visit', at));
+        break;
+      case 'DELETE photos':
+        visit.photos = visit.photos.filter((photo) => photo.fileId !== field.fileId);
+        break;
+      case 'POST complete':
+        Object.assign(visit, { status: 'completed', completedAt: at });
+        break;
+      case 'POST missed':
+        Object.assign(visit, { status: 'missed' });
+        break;
+      default:
+        return invalid();
+    }
+    return { view: visitResponse(visit) };
+  }
+  switch (field.action) {
+    case 'POST arrive':
+      session.arrival = arrival;
+      break;
+    case 'POST photos':
+      session.photos.push(photoOf(String(body.fileId), String(body.kind), at));
+      break;
+    case 'DELETE photos':
+      session.photos = session.photos.filter((photo) => photo.fileId !== field.fileId);
+      break;
+    case 'POST start':
+      if (options.startRefused)
+        return { status: 422, error: error(options.startRefused, 'Démarrage refusé.') };
+      if (!session.photos.some((photo) => photo.kind === 'before'))
+        return {
+          status: 422,
+          error: error('CLEANING_PHOTOS_MISSING', 'Photo « avant » manquante.', { kind: 'before' }),
+        };
+      Object.assign(session, { status: 'in_progress', startedAt: at });
+      break;
+    case 'PATCH checklist':
+      for (const tick of body.items as Array<{ code: string; checked: boolean }>) {
+        const item = session.checklist.find((point) => point.code === tick.code);
+        if (item) Object.assign(item, { checked: tick.checked, checkedAt: tick.checked ? at : null });
+      }
+      break;
+    case 'POST incident':
+      session.incidents.push({
+        id: '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8dc301',
+        category: body.category,
+        note: body.note,
+        photos: [],
+        reportedAt: at,
+        decision: 'pending',
+        decidedAt: null,
+      });
+      session.status = 'interrupted';
+      break;
+    case 'POST complete':
+      if (session.checklist.some((item) => !item.checked))
+        return { status: 422, error: error('CLEANING_CHECKLIST_INCOMPLETE', 'Liste incomplète.') };
+      Object.assign(session, { status: 'completed', completedAt: at });
+      break;
+    case 'POST missed':
+      session.status = 'missed';
+      break;
+    default:
+      return invalid();
+  }
+  return { view: sessionResponse(session) };
 }

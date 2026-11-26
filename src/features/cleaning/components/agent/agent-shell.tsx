@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { IconBriefcase, IconCalendar, IconClock, IconUser } from '@/components/ui/icons';
 import { navigation } from '@/config/navigation';
 import { cn } from '@/lib/cn';
+import { FieldStatus } from '@/features/cleaning/components/lazy';
 
 /** Libellés écrits ici : la navigation est lue par toutes les pages de l'espace, sans les textes des écrans. */
 const ITEMS = [
@@ -15,10 +16,11 @@ const ITEMS = [
   { ...navigation.agentProfile, icon: IconUser, exact: false },
 ] as const;
 
-/** Fiches et notifications : rattachées à « Aujourd'hui ». */
+/** Fiches, envois en attente et notifications : rattachés à « Aujourd'hui ». */
 const TODAY_CHILDREN = [
   navigation.agentVisit.href,
   navigation.agentSession.href,
+  navigation.agentOutbox.href,
   navigation.agentNotifications.href,
 ];
 
@@ -31,6 +33,8 @@ function isActive(pathname: string, item: (typeof ITEMS)[number]): boolean {
  * Cadre de l'espace agent : navigation à 4 entrées (Aujourd'hui, Affectations, Disponibilités, Profil),
  * fixée en bas de l'écran du téléphone (une main, cibles de 64 px de haut), en onglets au-dessus du
  * contenu dès 640 px. Réserve sa hauteur (`--bottom-nav-h`) : une barre d'action se pose au-dessus.
+ * Au-dessus du contenu : l'état du terrain (hors connexion, envois en attente) et le rejeu de la file,
+ * chargés après l'affichage (`FieldStatus`).
  */
 export function AgentShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -76,6 +80,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
           })}
         </ul>
       </nav>
+      <FieldStatus />
       {children}
       <div aria-hidden="true" className="h-(--bottom-nav-h) sm:hidden" />
     </div>

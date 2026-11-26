@@ -147,13 +147,17 @@ describe('service worker de KSP Pro', () => {
     expect(Buffer.byteLength(SOURCE, 'utf8')).toBeLessThanOrEqual(5 * 1024);
   });
 
-  it('installation : garde la page hors connexion et l’accueil, avec leurs styles et scripts', async () => {
+  it('installation : garde la page hors connexion, l’accueil et les coques de terrain, avec leurs fichiers', async () => {
     const sw = setup();
     await sw.lifecycle('install');
 
-    const pages = [...(sw.stores.get('ksp-pro-pages-v1')?.store.keys() ?? [])];
-    expect(pages).toEqual([`${ORIGIN}/hors-ligne`, `${ORIGIN}/`]);
-    const assets = [...(sw.stores.get('ksp-pro-assets-v1')?.store.keys() ?? [])];
+    const pages = [...(sw.stores.get('ksp-pro-pages-v2')?.store.keys() ?? [])];
+    expect(pages.sort()).toEqual(
+      ['/', '/agent', '/agent/envois', '/agent/seance', '/agent/visite', '/hors-ligne'].map(
+        (path) => `${ORIGIN}${path}`,
+      ),
+    );
+    const assets = [...(sw.stores.get('ksp-pro-assets-v2')?.store.keys() ?? [])];
     expect(assets).toEqual(
       expect.arrayContaining([
         `${ORIGIN}/_next/static/css/app.css`,
@@ -166,12 +170,12 @@ describe('service worker de KSP Pro', () => {
 
   it('activation : efface les caches des anciennes versions, pas ceux des autres', async () => {
     const sw = setup();
-    for (const name of ['ksp-pro-pages-v0', 'ksp-pro-assets-v0', 'ksp-pro-pages-v1', 'autre-cache']) {
+    for (const name of ['ksp-pro-pages-v1', 'ksp-pro-assets-v1', 'ksp-pro-pages-v2', 'autre-cache']) {
       await sw.caches.open(name);
     }
     await sw.lifecycle('activate');
 
-    expect([...sw.stores.keys()].sort()).toEqual(['autre-cache', 'ksp-pro-pages-v1']);
+    expect([...sw.stores.keys()].sort()).toEqual(['autre-cache', 'ksp-pro-pages-v2']);
     expect(sw.self.clients.claim).toHaveBeenCalled();
   });
 
@@ -222,7 +226,7 @@ describe('service worker de KSP Pro', () => {
       pages: { '/invitations/abc': () => html('invitation', { 'Cache-Control': 'private, no-store' }) },
     });
     await sw.request('/invitations/abc', { mode: 'navigate' });
-    expect(sw.stores.get('ksp-pro-pages-v1')?.store.has(`${ORIGIN}/invitations/abc`) ?? false).toBe(false);
+    expect(sw.stores.get('ksp-pro-pages-v2')?.store.has(`${ORIGIN}/invitations/abc`) ?? false).toBe(false);
   });
 
   it('réseau très lent : passé le délai, la copie gardée s’affiche', async () => {

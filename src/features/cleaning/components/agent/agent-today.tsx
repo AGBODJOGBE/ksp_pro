@@ -1,17 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { BackendPending } from '@/components/ui/backend-pending';
+import { FormMessage } from '@/components/ui/field';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
 import { IconChevronRight, IconClock } from '@/components/ui/icons';
 import { SkeletonCards } from '@/components/ui/skeleton';
 import { navigation } from '@/config/navigation';
-import { beninDate, beninSlot, formatDate } from '@/lib/format';
+import { beninDate, beninSlot, formatDate, formatTime } from '@/lib/format';
+import type { Cached } from '@/lib/offline/today';
 import { useNow } from '@/lib/use-now';
 import { listMyAssignments } from '@/features/cleaning/agent-api';
 import { agentTexts } from '@/features/cleaning/agent-texts';
+import { cachePlanning, prefetchToday, readCachedPlanning } from '@/features/cleaning/field/today-cache';
+import { useFieldAccount } from '@/features/cleaning/field/account';
 import type { Assignment, AssignmentList } from '@/features/cleaning/schemas';
 import { AssignmentCard, isInForce } from './assignment-card';
 import { LoadFailure } from './states';
@@ -48,6 +52,9 @@ function Group({ id, title, children }: { id: string; title: string; children: R
  * « Aujourd'hui » : les interventions du jour (`GET /me/assignments`, de minuit à minuit, heure du Bénin),
  * la prochaine en tête, puis le reste de la journée, ce qui est passé, ce qui est annulé ou retiré.
  * Un indépendant y répond aux affectations en attente ; un bandeau signale celles des 7 prochains jours.
+ *
+ * Hors connexion (F-022) : la journée gardée sur le téléphone s'affiche d'abord (avec l'heure de sa mise à
+ * jour), puis la gateway la remplace. Chaque lecture réussie est gardée, avec les fiches du jour.
  */
 export function AgentToday({ aside }: { aside?: ReactNode }) {
   const now = useNow();
@@ -59,6 +66,30 @@ export function AgentToday({ aside }: { aside?: ReactNode }) {
   );
   const today = useLoad<AssignmentList>(loadToday);
   const pending = useLoad<AssignmentList>(loadPending);
+  const userId = useFieldAccount();
+  const [cached, setCached] = useState<Cached<AssignmentList> | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    void readCachedPlanning(userId).then((copy) => {
+      // Seule la journée en cours compte : une copie d'hier n'est pas montrée.
+      if (active && copy && beninDate(new Date(copy.savedAt)) === beninDate(new Date(range.opened)))
+        setCached(copy);
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId, range.opened]);
+
+  // Journée lue : gardée sur le téléphone, avec les fiches du jour (lisibles sans réseau).
+  const fresh = today.state.status === 'ready' ? today.state.data : null;
+  useEffect(() => {
+    if (!userId || !fresh) return;
+    const controller = new AbortController();
+    void cachePlanning(userId, fresh).then(() => prefetchToday(userId, fresh.data, controller.signal));
+    return () => controller.abort();
+  }, [userId, fresh]);
   const canRespond = isIndependent(profile.state);
   const reference = now ?? range.opened;
 
@@ -89,9 +120,13 @@ export function AgentToday({ aside }: { aside?: ReactNode }) {
     </li>
   );
 
+  // Sans réponse de la gateway (chargement, réseau coupé) : la journée gardée sur le téléphone.
+  const showCopy = cached && (today.state.status === 'loading' || today.state.status === 'error');
+  const list: AssignmentList | null = fresh ?? (showCopy ? cached.data : null);
+
   let body: ReactNode;
-  if (today.state.status === 'loading') body = <SkeletonCards label={t.loading} rows={2} />;
-  else if (today.state.status === 'error')
+  if (!list && today.state.status === 'loading') body = <SkeletonCards label={t.loading} rows={2} />;
+  else if (!list && today.state.status === 'error')
     body = (
       <LoadFailure
         message={today.state.message}
@@ -99,7 +134,7 @@ export function AgentToday({ aside }: { aside?: ReactNode }) {
         onRetry={today.reload}
       />
     );
-  else if (today.state.status === 'pending')
+  else if (!list && today.state.status === 'pending')
     body = (
       <BackendPending
         id="aujourdhui-attente"
@@ -109,8 +144,8 @@ export function AgentToday({ aside }: { aside?: ReactNode }) {
         {t.emptyHint}
       </BackendPending>
     );
-  else {
-    const items = today.state.data.data;
+  else if (list) {
+    const items = list.data;
     const active = items.filter(isInForce);
     const upcoming = active.filter((item) => Date.parse(item.end) > reference);
     const past = active.filter((item) => Date.parse(item.end) <= reference);
@@ -138,7 +173,7 @@ export function AgentToday({ aside }: { aside?: ReactNode }) {
             {other.map((item) => card(item))}
           </Group>
         ) : null}
-        {today.state.data.nextCursor ? (
+        {list.nextCursor ? (
           <Link
             href={navigation.agentAssignments.href}
             className="text-ink min-h-12 font-semibold underline underline-offset-4"
@@ -189,6 +224,24 @@ export function AgentToday({ aside }: { aside?: ReactNode }) {
             <IconChevronRight className="size-5" />
           </span>
         </Link>
+      ) : null}
+      {showCopy ? (
+        <div className="grid justify-items-start gap-2">
+          <FormMessage tone="info">
+            {today.state.status === 'error'
+              ? t.cachedOffline(formatTime(new Date(cached.savedAt).toISOString()))
+              : t.cachedRefreshing(formatTime(new Date(cached.savedAt).toISOString()))}
+          </FormMessage>
+          {today.state.status === 'error' ? (
+            <button
+              type="button"
+              onClick={today.reload}
+              className="text-ink min-h-12 font-semibold underline underline-offset-4"
+            >
+              {agentTexts.retry}
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {body}
     </div>

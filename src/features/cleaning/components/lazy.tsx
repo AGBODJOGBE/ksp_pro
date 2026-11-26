@@ -42,7 +42,25 @@ export const AgentProfileScreen = dynamic(
   { loading: Loading },
 );
 
-export const TargetPlaceholder = dynamic(
-  () => import('./agent/target-placeholder').then((module_) => module_.TargetPlaceholder),
+export const VisitSheet = dynamic(() => import('./field/visit-sheet').then((module_) => module_.VisitSheet), {
+  loading: Loading,
+});
+
+export const SessionSheet = dynamic(
+  () => import('./field/session-sheet').then((module_) => module_.SessionSheet),
   { loading: Loading },
+);
+
+export const PendingSends = dynamic(
+  () => import('./field/pending-sends').then((module_) => module_.PendingSends),
+  { loading: Loading },
+);
+
+/**
+ * État du terrain et rejeu de la file d'attente (cadre de l'espace agent) : rien au rendu serveur (il dépend
+ * du navigateur), chargé après l'affichage, sans état de chargement (rien ne bouge quand tout est envoyé).
+ */
+export const FieldStatus = dynamic(
+  () => import('./field/field-status').then((module_) => module_.FieldStatus),
+  { ssr: false },
 );
