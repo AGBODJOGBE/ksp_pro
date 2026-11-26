@@ -1,0 +1,10 @@
+{
+  "description": "Routes du périmètre de l'Espace pro laissées de côté volontairement, avec la raison (pnpm routes:coverage).",
+  "exclusions": [
+    {
+      "method": "PUT",
+      "path": "/api/v1/cleaning/agent/requests/{id}/location",
+      "reason": "inutilisable : aucune vue de l'agent ne donne l'identifiant de la demande (prérequis back B5)"
+    }
+  ]
+}
