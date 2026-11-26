@@ -3,10 +3,6 @@ import { session } from '@/lib/api';
 import { AGENT_PERMS, errorBody, sessionBody, stubGateway } from '@/lib/api/fake-gateway.test-utils';
 import { ACTIVITY, agentBody, ZONES } from '@/features/cleaning/cleaning.test-utils';
 import { AgentProfileScreen } from './agent-profile';
-import { TargetPlaceholder } from './target-placeholder';
-
-const search = { value: new URLSearchParams() };
-vi.mock('next/navigation', () => ({ useSearchParams: () => search.value }));
 
 const ME = 'GET /api/v1/cleaning/agent/me';
 const ACTIVITY_ROUTE = 'GET /api/v1/cleaning/agent/me/activity';
@@ -71,19 +67,5 @@ describe('profil et activité', () => {
     expect(await screen.findByText(/Service momentanément indisponible\./)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Koffi Adjovi' })).toBeInTheDocument();
-  });
-});
-
-describe('fiche provisoire', () => {
-  it('annonce la fiche de la prochaine version, ou signale un lien incomplet', () => {
-    search.value = new URLSearchParams('id=v-1');
-    const { unmount } = render(<TargetPlaceholder kind="visit" />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Fiche de la visite' })).toBeInTheDocument();
-    expect(screen.getByText('La fiche arrive bientôt')).toBeInTheDocument();
-    unmount();
-
-    search.value = new URLSearchParams();
-    render(<TargetPlaceholder kind="session" />);
-    expect(screen.getByText('Lien incomplet : ouvrez la fiche depuis votre journée.')).toBeInTheDocument();
   });
 });

@@ -142,3 +142,36 @@ describe('menu du compte et déconnexion', () => {
     expect(calls.filter((call) => call.path === '/api/v1/identity/token/refresh')).toHaveLength(2);
   });
 });
+
+describe('espace agent hors connexion (F-022)', () => {
+  const offlineSpace = () =>
+    render(
+      <RequireSession allowOffline>
+        <p>Journée gardée</p>
+      </RequireSession>,
+    );
+
+  it('réseau coupé : l’espace s’ouvre sur les données du téléphone, puis reprend la session au retour du réseau', async () => {
+    localStorage.setItem('ksp.compte', '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8d9e11');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    offlineSpace();
+
+    expect(await screen.findByText('Journée gardée')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Hors connexion : vous voyez ce qui est gardé sur ce téléphone/),
+    ).toBeInTheDocument();
+
+    stubGateway({ [REFRESH]: { status: 200, body: sessionBody({ profileIncomplete: false }) } });
+    window.dispatchEvent(new Event('online'));
+    await waitFor(() => expect(screen.queryByText(/Hors connexion/)).not.toBeInTheDocument());
+    expect(screen.getByText('Journée gardée')).toBeInTheDocument();
+    localStorage.clear();
+  });
+
+  it('aucun compte sur ce téléphone, ou panne de la gateway : message et « Réessayer »', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    offlineSpace();
+    expect(await screen.findByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
+    expect(screen.queryByText('Journée gardée')).not.toBeInTheDocument();
+  });
+});

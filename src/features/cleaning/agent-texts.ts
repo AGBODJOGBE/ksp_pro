@@ -110,6 +110,9 @@ export const agentTexts = {
     emptyHint: 'Vos prochaines affectations sont dans l’onglet « Affectations ».',
     seeAll: 'Voir mes affectations',
     loading: 'Chargement de votre journée…',
+    cachedOffline: (time: string) =>
+      `Hors connexion : journée gardée sur ce téléphone, mise à jour à ${time}.`,
+    cachedRefreshing: (time: string) => `Journée gardée à ${time}, mise à jour en cours…`,
     pending: (count: number) =>
       `${count} ${plural(count, 'affectation attend', 'affectations attendent')} votre réponse`,
     pendingLink: 'Répondre',
@@ -238,14 +241,5 @@ export const agentTexts = {
     hours: 'Heures',
     periodSessions: 'Séances',
     empty: 'Pas encore d’activité enregistrée.',
-  },
-  placeholder: {
-    visitTitle: 'Fiche de la visite',
-    sessionTitle: 'Fiche de la séance',
-    soonTitle: 'La fiche arrive bientôt',
-    soonText:
-      'Arrivée sur place, photos, constat et fin d’intervention seront disponibles ici, même sans réseau.',
-    missing: 'Lien incomplet : ouvrez la fiche depuis votre journée.',
-    back: 'Retour à ma journée',
   },
 } as const;

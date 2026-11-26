@@ -17,10 +17,18 @@ export const fr = {
   account: {
     loading: 'Chargement de votre espace…',
     unavailable: 'Impossible de vérifier votre connexion.',
+    offline:
+      'Hors connexion : vous voyez ce qui est gardé sur ce téléphone. Vos actions de terrain partiront au retour du réseau.',
     endedTitle: 'Vous n’êtes plus connecté',
     endedText: 'Votre session a pris fin. Reconnectez-vous pour retrouver votre espace.',
     signOut: 'Se déconnecter',
     signingOut: 'Déconnexion…',
+    unsent: (count: number) =>
+      count > 1
+        ? `${count} actions de terrain ne sont pas encore envoyées. Si vous vous déconnectez, elles seront perdues.`
+        : 'Une action de terrain n’est pas encore envoyée. Si vous vous déconnectez, elle sera perdue.',
+    signOutAnyway: 'Me déconnecter quand même',
+    stay: 'Rester connecté',
     phone: 'Numéro de connexion',
     refreshAccess: 'Actualiser mes accès',
     refreshingAccess: 'Actualisation…',

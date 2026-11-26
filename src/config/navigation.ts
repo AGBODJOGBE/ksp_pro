@@ -18,6 +18,8 @@ export const navigation = {
   /** Fiches de terrain : identifiant dans la recherche (`?id=`), une seule coque par écran (service worker). */
   agentVisit: { label: 'Visite', href: '/agent/visite' } satisfies NavItem,
   agentSession: { label: 'Séance', href: '/agent/seance' } satisfies NavItem,
+  /** Actions de terrain gardées hors connexion, pas encore reçues par KSP. */
+  agentOutbox: { label: 'Envois en attente', href: '/agent/envois' } satisfies NavItem,
   partner: { label: 'Espace partenaire', href: '/partenaire' } satisfies NavItem,
   application: { label: 'Candidature', href: '/candidature' } satisfies NavItem,
   offline: { label: 'Hors connexion', href: '/hors-ligne' } satisfies NavItem,

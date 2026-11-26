@@ -482,3 +482,53 @@ export function IconInvitation(props: IconProps) {
     </Icon>
   );
 }
+
+/** Appareil photo : prendre une photo sur le terrain. */
+export function IconCamera(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4.5 8h2.6l1.6-2.5h6.6L16.9 8h2.6a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18V9.5A1.5 1.5 0 0 1 4.5 8Z" />
+      <circle cx="12" cy="13.25" r="3.5" />
+    </Icon>
+  );
+}
+
+/** Itinéraire : chemin entre deux points. */
+export function IconRoute(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="6" cy="18" r="2.25" />
+      <path d="M8.25 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5" />
+      <path d="M18 3.5 20.5 6 18 8.5" />
+    </Icon>
+  );
+}
+
+/** Corbeille : retirer. */
+export function IconTrash(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.9 12a1.5 1.5 0 0 0 1.5 1.4h6.2a1.5 1.5 0 0 0 1.5-1.4l.9-12" />
+      <path d="M10 11v5.5M14 11v5.5" />
+    </Icon>
+  );
+}
+
+/** Nuage et flèche : envoi en attente du réseau. */
+export function IconCloudUp(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M7 18.5a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9a4.75 4.75 0 0 1-.5 9.5" />
+      <path d="M12 20.5v-7M9.25 16 12 13.25 14.75 16" />
+    </Icon>
+  );
+}
+
+/** Drapeau : signaler un incident. */
+export function IconFlag(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5.5 21V4M5.5 4.5h11l-2.25 4 2.25 4h-11" />
+    </Icon>
+  );
+}

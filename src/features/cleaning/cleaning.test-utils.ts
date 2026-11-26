@@ -132,3 +132,206 @@ export const ACTIVITY = {
   ],
   months: [{ periodStart: '2026-11-01', hours: 46, sessionsCompleted: 14 }],
 };
+
+/* ——— Terrain : fiches de visite et de séance (`CleaningAgentVisitView`, `CleaningAgentSessionView`) ——— */
+
+export const VISIT_ID = '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8db002';
+export const SESSION_ID = '0192f1c4-7a2b-7c3d-8e4f-5a6b7c8db001';
+
+const place = (location: boolean) => ({
+  name: 'Villa Les Palmiers',
+  placeTypeName: 'Villa',
+  communeName: 'Abomey-Calavi',
+  location: location
+    ? {
+        latitude: 6.4485,
+        longitude: 2.3557,
+        landmark: 'Portail bleu après la pharmacie',
+        address: 'Rue 12, Tankpè',
+        readableAddress: null,
+        accuracyMeters: 15,
+      }
+    : null,
+  customerFirstName: 'Afi',
+});
+
+export function visitBody(overrides: Record<string, unknown> = {}) {
+  const status = (overrides.status as string | undefined) ?? 'scheduled';
+  return {
+    id: VISIT_ID,
+    requestNumber: 'NET-2026-00042',
+    status,
+    scheduledAt: '2026-11-26T09:00:00Z',
+    durationMinutes: 60,
+    isLead: true,
+    place: place(status === 'in_progress'),
+    cleaningTypes: [{ id: 't1', code: 'sol', name: 'Sols' }],
+    parameters: [
+      {
+        id: 'p1',
+        code: 'superficie',
+        label: 'Superficie',
+        kind: 'number',
+        unit: 'm²',
+        min: 10,
+        max: 2000,
+        choices: [],
+        required: true,
+        help: null,
+        active: true,
+      },
+      {
+        id: 'p2',
+        code: 'etat',
+        label: 'État général',
+        kind: 'choice',
+        unit: null,
+        min: null,
+        max: null,
+        choices: [
+          { code: 'propre', label: 'Propre', active: true },
+          { code: 'sale', label: 'Sale', active: true },
+          { code: 'tres_sale', label: 'Très sale', active: false },
+        ],
+        required: true,
+        help: 'Votre impression en entrant.',
+        active: true,
+      },
+      {
+        id: 'p3',
+        code: 'animaux',
+        label: 'Animaux présents',
+        kind: 'boolean',
+        unit: null,
+        min: null,
+        max: null,
+        choices: [],
+        required: false,
+        help: null,
+        active: true,
+      },
+      {
+        id: 'p4',
+        code: 'ancien',
+        label: 'Paramètre retiré',
+        kind: 'number',
+        unit: null,
+        min: null,
+        max: null,
+        choices: [],
+        required: true,
+        help: null,
+        active: false,
+      },
+    ],
+    declaredValues: { superficie: 120, etat: 'tres_sale', animaux: false },
+    observedValues: null,
+    photos: [],
+    arrival: null,
+    completedAt: null,
+    note: null,
+    ...overrides,
+  };
+}
+
+export const ARRIVAL = {
+  arrivedAt: '2026-11-26T08:58:00Z',
+  distanceMeters: 40,
+  alert: false,
+  placeAccuracyMeters: 15,
+  arrivalAccuracyMeters: 12,
+  uncertain: false,
+};
+
+export function photoBody(fileId: string, kind: string) {
+  return {
+    fileId,
+    kind,
+    takenAt: '2026-11-26T09:05:00Z',
+    url: `https://stockage.test/ksp-files/${fileId}?X-Amz-Signature=lecture`,
+    urlExpiresAt: '2026-11-26T10:05:00Z',
+  };
+}
+
+export function sessionViewBody(overrides: Record<string, unknown> = {}) {
+  const status = (overrides.status as string | undefined) ?? 'assigned';
+  return {
+    id: SESSION_ID,
+    programNumber: 'PRG-2026-0007',
+    rank: 3,
+    status,
+    scheduledStart: '2026-11-26T09:00:00Z',
+    scheduledEnd: '2026-11-26T12:00:00Z',
+    isLead: true,
+    team: [
+      {
+        agentId: 'a1',
+        firstName: 'Koffi',
+        lastName: 'Adjovi',
+        photoUrl: null,
+        isLead: true,
+        confirmation: 'confirmed',
+      },
+      {
+        agentId: 'a2',
+        firstName: 'Rachidi',
+        lastName: 'Sanni',
+        photoUrl: null,
+        isLead: false,
+        confirmation: 'confirmed',
+      },
+    ],
+    place: place(status === 'in_progress'),
+    checklist: [
+      { code: 'arrival', label: 'Matériel déballé', cleaningTypeCode: null, checked: false, checkedAt: null },
+      {
+        code: 'sol_balayage',
+        label: 'Sols balayés',
+        cleaningTypeCode: 'sol',
+        checked: false,
+        checkedAt: null,
+      },
+    ],
+    photos: [],
+    incidents: [],
+    arrival: null,
+    startedAt: null,
+    completedAt: null,
+    ...overrides,
+  };
+}
+
+export const STORED_FILE = (id: string, status = 'available') => ({
+  id,
+  purpose: 'cleaning_intervention_photo',
+  fileName: 'photo.jpg',
+  contentType: 'image/jpeg',
+  sizeBytes: 4,
+  status,
+  rejectionReason: null,
+  subject: null,
+  createdAt: '2026-11-26T09:00:00Z',
+  completedAt: status === 'available' ? '2026-11-26T09:00:01Z' : null,
+});
+
+/** Routes du dépôt d'une photo (`f1`, `f2`…) : déclaration, stockage, confirmation. */
+export function uploadRoutes(ids: string[]) {
+  return {
+    'POST /api/v1/file/uploads': ids.map((id) => ({
+      status: 200,
+      body: {
+        file: STORED_FILE(id, 'pending'),
+        upload: {
+          url: `https://stockage.test/ksp-files/${id}?X-Amz-Signature=abc`,
+          method: 'PUT',
+          headers: { 'Content-Type': 'image/jpeg' },
+          expiresAt: '2026-11-26T09:15:00Z',
+        },
+      },
+    })),
+    ...Object.fromEntries(ids.map((id) => [`PUT /ksp-files/${id}`, { status: 200, body: {} }])),
+    ...Object.fromEntries(
+      ids.map((id) => [`POST /api/v1/file/files/${id}/complete`, { status: 200, body: STORED_FILE(id) }]),
+    ),
+  };
+}

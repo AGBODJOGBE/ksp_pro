@@ -8,6 +8,7 @@ import { IconLogout, IconUser } from '@/components/ui/icons';
 import { navigation } from '@/config/navigation';
 import { getDictionary } from '@/i18n';
 import { useSession } from '@/lib/api';
+import { listEntries } from '@/lib/offline/outbox';
 import { formatPhone } from '@/lib/phone';
 import { signOut } from '@/features/identity/access';
 import { RefreshAccessButton } from './refresh-access';
@@ -17,6 +18,8 @@ const MENU_ID = 'menu-compte';
 /**
  * Menu du compte dans l'en-tête (panneau `popover` natif : Échap et clic à l'extérieur le ferment) : nom
  * et numéro, « Actualiser mes accès », « Se déconnecter ». Rien tant qu'aucune session n'est ouverte.
+ * La déconnexion efface les actions de terrain pas encore envoyées (F-022) : s'il en reste, elle le dit
+ * et demande une confirmation.
  */
 export function AccountMenu() {
   const t = getDictionary();
@@ -24,15 +27,23 @@ export function AccountMenu() {
   const { replace } = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unsent, setUnsent] = useState(0);
 
   if (!current) return null;
   const { firstName, lastName, phone } = current.user;
   const name = [firstName, lastName].filter(Boolean).join(' ');
 
-  async function leave() {
-    if (pending) return;
+  async function leave(confirmed = false) {
+    if (pending || !current) return;
     setPending(true);
     setError(null);
+    const waiting = confirmed ? 0 : (await listEntries(current.user.id)).length;
+    if (waiting > 0) {
+      setUnsent(waiting);
+      setPending(false);
+      return;
+    }
+    setUnsent(0);
     const result = await signOut();
     setPending(false);
     if (!result.ok) return setError(result.message);
@@ -68,10 +79,30 @@ export function AccountMenu() {
         ) : null}
         <div className="border-line mt-4 grid gap-2 border-t pt-4">
           <RefreshAccessButton />
-          <Button variant="ghost" onClick={leave} aria-busy={pending || undefined} className="w-full">
-            <IconLogout />
-            {pending ? t.account.signingOut : t.account.signOut}
-          </Button>
+          {unsent ? (
+            <div
+              role="alert"
+              className="rounded-control border-warning bg-warning-soft grid gap-2 border p-3"
+            >
+              <p className="text-ink text-small font-semibold">{t.account.unsent(unsent)}</p>
+              <Button variant="primary" onClick={() => leave(true)} aria-busy={pending || undefined}>
+                {t.account.signOutAnyway}
+              </Button>
+              <Button variant="ghost" onClick={() => setUnsent(0)}>
+                {t.account.stay}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              onClick={() => leave()}
+              aria-busy={pending || undefined}
+              className="w-full"
+            >
+              <IconLogout />
+              {pending ? t.account.signingOut : t.account.signOut}
+            </Button>
+          )}
           <FormMessage>{error}</FormMessage>
         </div>
       </div>

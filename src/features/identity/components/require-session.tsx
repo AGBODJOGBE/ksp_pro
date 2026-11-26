@@ -5,20 +5,27 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { FormMessage } from '@/components/ui/field';
 import { Heading } from '@/components/ui/heading';
+import { IconWifiOff } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { navigation } from '@/config/navigation';
 import { getDictionary } from '@/i18n';
-import { isDeletionPending, session, useSession } from '@/lib/api';
+import { ApiError, isDeletionPending, session, useSession } from '@/lib/api';
+import { deviceAccountId } from '@/lib/api/device-account';
 import { describeError } from '@/features/identity/errors';
 import { loginHref } from '@/features/identity/return-path';
 import { DeletionPending } from './deletion-pending';
 import { ProfileForm } from './lazy';
 
-type Phase = 'checking' | 'unavailable' | 'ready';
+type Phase = 'checking' | 'unavailable' | 'offline' | 'ready';
 
 /** Page demandée, recherche comprise, pour y revenir après la connexion. */
 function currentPath(pathname: string): string {
   return typeof window === 'undefined' ? pathname : `${pathname}${window.location.search}`;
+}
+
+/** La gateway n'a pas pu être jointe (réseau coupé), par opposition à une panne ou un refus. */
+function isNetworkFailure(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 0;
 }
 
 /**
@@ -27,8 +34,18 @@ function currentPath(pathname: string): string {
  * Profil incomplet : « Complétez votre profil » avant tout le reste. Compte en cours de suppression
  * (ADR-036) : explication et lien vers le portail. Le backend reste seul juge des droits : cette garde
  * n'évite que d'afficher un espace vide ou en erreur.
+ *
+ * `allowOffline` (espace agent, F-022) : sans réseau, la session ne peut pas être reprise (le jeton vit en
+ * mémoire) ; l'espace s'ouvre alors sur les données gardées sur ce téléphone par le dernier compte connecté,
+ * avec un bandeau, et la session est reprise dès le retour du réseau.
  */
-export function RequireSession({ children }: { children: ReactNode }) {
+export function RequireSession({
+  children,
+  allowOffline = false,
+}: {
+  children: ReactNode;
+  allowOffline?: boolean;
+}) {
   const t = getDictionary();
   const { replace } = useRouter();
   const pathname = usePathname();
@@ -45,7 +62,9 @@ export function RequireSession({ children }: { children: ReactNode }) {
         replace(loginHref(currentPath(pathname)));
       } else if (result.status === 'unavailable') {
         setError(describeError(result.error).message);
-        setPhase('unavailable');
+        setPhase(
+          allowOffline && isNetworkFailure(result.error) && deviceAccountId() ? 'offline' : 'unavailable',
+        );
       } else {
         setPhase('ready');
       }
@@ -53,11 +72,42 @@ export function RequireSession({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [attempt, pathname, replace]);
+  }, [attempt, pathname, replace, allowOffline]);
+
+  // Hors connexion : la session est redemandée dès le retour du réseau.
+  useEffect(() => {
+    if (phase !== 'offline') return;
+    const retry = () => setAttempt((value) => value + 1);
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  }, [phase]);
 
   if (current) {
     if (isDeletionPending(current)) return <DeletionPending />;
-    return current.profileIncomplete ? <ProfileForm autoFocus /> : <>{children}</>;
+    // Même structure que la branche hors connexion : l'écran ouvert garde son état au retour du réseau.
+    return current.profileIncomplete ? (
+      <ProfileForm autoFocus />
+    ) : (
+      <>
+        {null}
+        {children}
+      </>
+    );
+  }
+
+  if (phase === 'offline') {
+    return (
+      <>
+        <p
+          role="status"
+          className="rounded-card border-line bg-surface-muted text-ink mb-5 flex items-start gap-3 border p-4"
+        >
+          <IconWifiOff className="text-ink-muted mt-0.5 size-5 shrink-0" />
+          <span>{t.account.offline}</span>
+        </p>
+        {children}
+      </>
+    );
   }
 
   if (phase === 'unavailable') {

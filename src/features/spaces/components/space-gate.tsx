@@ -14,10 +14,21 @@ import { spacesTexts } from '@/features/spaces/texts';
  * Garde d'un espace (sous `RequireSession`) : sans le droit dans le jeton, un message clair, « Actualiser
  * mes accès » et le retour au choix de l'espace, au lieu d'un écran qui échouerait sur des 403. Le
  * backend reste seul juge des droits.
+ *
+ * `allowOffline` : sans session parce que le réseau manque (`RequireSession allowOffline`), l'espace s'ouvre
+ * sur les données gardées sur le téléphone ; les droits seront relus avec la session, au retour du réseau.
  */
-export function SpaceGate({ space, children }: { space: Space; children: ReactNode }) {
+export function SpaceGate({
+  space,
+  children,
+  allowOffline = false,
+}: {
+  space: Space;
+  children: ReactNode;
+  allowOffline?: boolean;
+}) {
   const current = useSession();
-  if (!current) return null;
+  if (!current) return allowOffline ? <>{children}</> : null;
   if (hasSpace(grantsFromAccessToken(current.accessToken), space)) return <>{children}</>;
 
   const t = spacesTexts.denied;
