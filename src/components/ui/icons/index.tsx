@@ -1,0 +1,484 @@
+import { cn } from '@/lib/cn';
+import { Icon, type IconProps } from './icon';
+
+export type { IconProps };
+
+/* Icônes d'interface — dessinées pour le projet, aucune bibliothèque ajoutée. */
+
+export function IconMenu(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 7h16M4 12h16M4 17h10" />
+    </Icon>
+  );
+}
+
+export function IconClose(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </Icon>
+  );
+}
+
+export function IconArrowRight(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </Icon>
+  );
+}
+
+export function IconArrowLeft(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M19 12H5M11 6l-6 6 6 6" />
+    </Icon>
+  );
+}
+
+export function IconAlert(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.75v5M12 16.25h.01" />
+    </Icon>
+  );
+}
+
+export function IconArrowUpRight(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M7 17 17 7M8.5 7H17v8.5" />
+    </Icon>
+  );
+}
+
+export function IconChevronDown(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </Icon>
+  );
+}
+
+export function IconUser(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="8" r="3.75" />
+      <path d="M4.5 20c1.4-3.4 4.2-5 7.5-5s6.1 1.6 7.5 5" />
+    </Icon>
+  );
+}
+
+export function IconCheck(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </Icon>
+  );
+}
+
+/** Mallette : compte entreprise. */
+export function IconBriefcase(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="7.5" width="17" height="12" rx="2" />
+      <path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5" />
+      <path d="M3.5 12.5h17" />
+    </Icon>
+  );
+}
+
+/** Combiné de téléphone. */
+export function IconPhone(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 4h3.5l1.5 4-2.2 1.4a11 11 0 0 0 6.8 6.8L16 14l4 1.5V19a1.5 1.5 0 0 1-1.6 1.5A16 16 0 0 1 3.5 5.6 1.5 1.5 0 0 1 5 4z" />
+    </Icon>
+  );
+}
+
+/** Enveloppe : e-mail. */
+export function IconMail(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+      <path d="m4 7 8 6 8-6" />
+    </Icon>
+  );
+}
+
+/** Cloche : notifications. */
+export function IconBell(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </Icon>
+  );
+}
+
+export function IconWallet(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3" />
+      <path d="M4 7.5v10A2.5 2.5 0 0 0 6.5 20H20v-12H6.5A2.5 2.5 0 0 1 4 7.5" />
+      <path d="M16 14h.01" />
+    </Icon>
+  );
+}
+
+export function IconClock(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </Icon>
+  );
+}
+
+export function IconImage(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <circle cx="9" cy="10" r="1.75" />
+      <path d="m20.5 16-4.5-4.5L7 19.5" />
+    </Icon>
+  );
+}
+
+/* Icônes des six métiers. */
+
+export function IconRecouvrement(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-4-4Z" />
+      <path d="M14 3v4h4M9.5 14.5l2 2 3.5-4" />
+    </Icon>
+  );
+}
+
+export function IconImmobilier(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m3 11 9-7 9 7" />
+      <path d="M5.5 9.5V20h13V9.5M10 20v-5.5h4V20" />
+    </Icon>
+  );
+}
+
+export function IconNettoyage(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M11 4c3 3.8 5 6.4 5 9.3a5 5 0 0 1-10 0C6 10.4 8 7.8 11 4Z" />
+      <path d="M19 3v4M17 5h4M19.5 15.5v3M18 17h3" />
+    </Icon>
+  );
+}
+
+export function IconImpression(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M7 9V3.5h10V9" />
+      <path d="M7 17.5H4.5a1 1 0 0 1-1-1V11a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v5.5a1 1 0 0 1-1 1H17" />
+      <path d="M7 14h10v6.5H7z" />
+    </Icon>
+  );
+}
+
+export function IconMarketplace(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 8h14l-1.1 11.1a1 1 0 0 1-1 .9H7.1a1 1 0 0 1-1-.9L5 8Z" />
+      <path d="M9 10.5V7a3 3 0 0 1 6 0v3.5" />
+    </Icon>
+  );
+}
+
+export function IconLivraison(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 6.5h10v9H3zM13 9.5h4.2l3.3 3.4v2.6H13" />
+      <circle cx="7" cy="17.5" r="1.9" />
+      <circle cx="17" cy="17.5" r="1.9" />
+    </Icon>
+  );
+}
+
+/** Logo WhatsApp (plein) : seul pictogramme de marque, conservé sous sa forme officielle. */
+export function IconWhatsApp({ title, className, ...props }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={cn('size-5 shrink-0 fill-current', className)}
+      {...(title ? { role: 'img', 'aria-label': title } : { 'aria-hidden': true })}
+      focusable="false"
+      {...props}
+    >
+      <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.3c0-.1-.2-.2-.4-.3Z" />
+    </svg>
+  );
+}
+
+/* Types de lieu du Nettoyage (nom d'icône libre envoyé par la gateway, interprété par le front). */
+
+export function IconHouse(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m3 11.5 9-7.5 9 7.5" />
+      <path d="M5.5 9.5V20h13V9.5" />
+      <path d="M10 20v-5h4v5" />
+    </Icon>
+  );
+}
+
+export function IconVilla(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m2 12 7-6 7 6" />
+      <path d="M4 10.5V20h10v-9.5M14 20h7v-7l-3.5-3L15 12" />
+      <path d="M7.5 20v-4h3v4" />
+    </Icon>
+  );
+}
+
+export function IconApartment(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 21V4h10v17M15 9h4v12M3 21h18" />
+      <path d="M8 8h1M11 8h1M8 12h1M11 12h1M8 16h1M11 16h1" />
+    </Icon>
+  );
+}
+
+export function IconOffice(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18M11 13v2h2v-2" />
+    </Icon>
+  );
+}
+
+export function IconConstruction(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 17a8 8 0 0 1 16 0" />
+      <path d="M10 9.3V6h4v3.3M2.5 17h19v3h-19z" />
+    </Icon>
+  );
+}
+
+/** Localisation (« Me localiser »). */
+export function IconLocate(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="6.5" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
+    </Icon>
+  );
+}
+
+/** Repère sur une carte (adresse). */
+export function IconPin(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" />
+      <circle cx="12" cy="10" r="2.25" />
+    </Icon>
+  );
+}
+
+export function IconCalendar(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+    </Icon>
+  );
+}
+
+export function IconFileCheck(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-4-4Z" />
+      <path d="M14 3v4h4M9.5 14.5l2 2 3.5-4" />
+    </Icon>
+  );
+}
+
+export function IconInvoice(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-4-4Z" />
+      <path d="M14 3v4h4M9 12h6M9 16h4" />
+    </Icon>
+  );
+}
+
+export function IconCard(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5.5" width="18" height="13" rx="2" />
+      <path d="M3 10h18M7 15h3" />
+    </Icon>
+  );
+}
+
+export function IconSwap(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M7 7h12l-3-3M17 17H5l3 3" />
+    </Icon>
+  );
+}
+
+export function IconHeadset(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
+      <rect x="3.5" y="13" width="4" height="6" rx="1.5" />
+      <rect x="16.5" y="13" width="4" height="6" rx="1.5" />
+      <path d="M18.5 19v.5a2.5 2.5 0 0 1-2.5 2.5h-3" />
+    </Icon>
+  );
+}
+
+export function IconSearch(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.4-4.4" />
+    </Icon>
+  );
+}
+
+export function IconInfo(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5.5M12 7.5v.01" />
+    </Icon>
+  );
+}
+
+export function IconChevronLeft(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m15 6-6 6 6 6" />
+    </Icon>
+  );
+}
+
+export function IconChevronRight(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m9 6 6 6-6 6" />
+    </Icon>
+  );
+}
+
+export function IconGrid(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+    </Icon>
+  );
+}
+
+/** Bouclier coché : sécurité d'un paiement ou d'une signature. */
+export function IconShield(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3.5 5 6v5.5c0 4.2 2.9 7.9 7 9 4.1-1.1 7-4.8 7-9V6l-7-2.5Z" />
+      <path d="m9 12 2 2 4-4" />
+    </Icon>
+  );
+}
+
+/** Stylo : signature d'un document. */
+export function IconPen(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M15.5 4.5 19.5 8.5 9 19H5v-4L15.5 4.5Z" />
+      <path d="M13.5 6.5l4 4M4 21h16" />
+    </Icon>
+  );
+}
+
+/** Étoile : note d'une prestation (contour ; remplie par `fill="currentColor"`). */
+export function IconStar(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" />
+    </Icon>
+  );
+}
+
+/* ——— Espace pro ——— */
+
+/** Flèches en cercle : actualiser (accès, liste). */
+export function IconRefresh(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M19.5 12a7.5 7.5 0 0 1-13.1 5M4.5 12a7.5 7.5 0 0 1 13.1-5" />
+      <path d="M17.8 3.5v3.7h-3.7M6.2 20.5v-3.7h3.7" />
+    </Icon>
+  );
+}
+
+/** Porte et flèche sortante : se déconnecter. */
+export function IconLogout(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M10 4.5H6.5A1.5 1.5 0 0 0 5 6v12a1.5 1.5 0 0 0 1.5 1.5H10" />
+      <path d="M14.5 8 19 12l-4.5 4M19 12H9.5" />
+    </Icon>
+  );
+}
+
+/** Réseau coupé : hors connexion. */
+export function IconWifiOff(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 8.8a14 14 0 0 1 19 0M5.5 12.2a9.5 9.5 0 0 1 13 0M8.6 15.5a5 5 0 0 1 6.8 0" />
+      <path d="M12 19h.01" />
+      <path d="M4 3.5 20 20.5" />
+    </Icon>
+  );
+}
+
+/** Téléphone et flèche vers le bas : installer l'application. */
+export function IconInstall(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
+      <path d="M12 7.5v6.5M9.25 11.5 12 14.25l2.75-2.75M10.5 18.5h3" />
+    </Icon>
+  );
+}
+
+/** Carré et flèche vers le haut : bouton « Partager » d'iOS. */
+export function IconShare(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M8.5 9H7a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 7 20h10a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 17 9h-1.5" />
+      <path d="M12 14V3.5M8.75 6.5 12 3.25l3.25 3.25" />
+    </Icon>
+  );
+}
+
+/** Enveloppe ouverte et carte : invitation reçue. */
+export function IconInvitation(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.5 10 12 4l8.5 6v9a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19v-9Z" />
+      <path d="m3.5 10 8.5 6 8.5-6" />
+    </Icon>
+  );
+}

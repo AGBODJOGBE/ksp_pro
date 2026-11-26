@@ -1,0 +1,80 @@
+import Link from 'next/link';
+import type { ComponentProps, ReactNode } from 'react';
+import { cn } from '@/lib/cn';
+
+/**
+ * `action` (vert) : l'action principale d'un écran (simuler, demander un devis, accepter, payer…) ;
+ * `primary` (bleu nuit) : action de marque ou de navigation forte (se connecter, mon espace) ;
+ * `secondary` : action complémentaire ; `ghost` : action discrète ; `danger` : action discrète qui clôt un
+ * dossier (annuler) ; `inverse` : sur fond bleu nuit.
+ * v3 (F-020), boutons en pilule : `accent` (or, texte bleu nuit, 6,1:1) pour l'entrée principale de
+ * l'en-tête (« Se connecter ») et du premier écran ; `outline` (contour bleu nuit) pour l'entrée
+ * secondaire (« Créer un compte »). Le vert (`action`) reste la couleur des validations des parcours.
+ */
+export type ButtonVariant =
+  'action' | 'primary' | 'secondary' | 'ghost' | 'danger' | 'inverse' | 'accent' | 'outline';
+export type ButtonSize = 'md' | 'lg' | 'icon';
+
+/*
+ * Survol : un voile (pseudo-élément) apparaît en fondu ; appui : léger enfoncement.
+ * Seuls `opacity` et `transform` sont animés.
+ */
+const BASE = cn(
+  'group/button relative isolate inline-flex items-center justify-center gap-2 overflow-hidden',
+  'rounded-full font-display font-semibold whitespace-nowrap select-none',
+  'transition-transform duration-(--motion-fast) ease-soft active:scale-[0.98]',
+  'before:absolute before:inset-0 before:-z-10 before:opacity-0 before:transition-opacity',
+  'before:duration-(--motion-base) before:ease-soft hover:before:opacity-100',
+  'disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 disabled:hover:before:opacity-0',
+);
+
+const VARIANTS: Record<ButtonVariant, string> = {
+  action: 'bg-action text-on-action before:bg-action-strong',
+  primary: 'bg-brand text-on-brand before:bg-brand-strong',
+  secondary: 'border border-line-strong bg-surface text-ink before:bg-surface-sunken',
+  ghost: 'text-ink before:bg-surface-sunken',
+  danger: 'text-danger before:bg-danger-soft',
+  inverse: 'bg-white text-brand-900 before:bg-brand-100',
+  accent: 'bg-accent text-on-accent before:bg-accent-bright',
+  outline: 'border-[1.5px] border-brand bg-surface text-brand before:bg-brand-soft',
+};
+
+/* Espace pro : cibles de 48 px au moins (terrain, une main, parfois des gants). */
+const SIZES: Record<ButtonSize, string> = {
+  md: 'min-h-12 px-5 text-base',
+  lg: 'min-h-14 px-7 text-lg',
+  icon: 'size-12',
+};
+
+type StyleProps = { variant?: ButtonVariant; size?: ButtonSize };
+
+export function buttonClasses({
+  variant = 'primary',
+  size = 'md',
+  className,
+}: StyleProps & { className?: string }): string {
+  return cn(BASE, VARIANTS[variant], SIZES[size], className);
+}
+
+export function Button({
+  variant,
+  size,
+  className,
+  type = 'button',
+  ...props
+}: ComponentProps<'button'> & StyleProps) {
+  return <button type={type} className={buttonClasses({ variant, size, className })} {...props} />;
+}
+
+export function ButtonLink({ variant, size, className, ...props }: ComponentProps<typeof Link> & StyleProps) {
+  return <Link className={buttonClasses({ variant, size, className })} {...props} />;
+}
+
+/** Icône qui glisse au survol du bouton parent (flèche placée après le libellé). */
+export function ButtonArrow({ children }: { children: ReactNode }) {
+  return (
+    <span className="ease-soft transition-transform duration-(--motion-base) group-hover/button:translate-x-0.5">
+      {children}
+    </span>
+  );
+}
